@@ -12,6 +12,7 @@ static VocalDynamicsAudioProcessor::Parameters::ParameterLayout createParameterL
     params.push_back(std::make_unique<AudioParameterFloat>(ParameterID{"threshold", 1}, "Silence Threshold",
         NormalisableRange<float>(-90.0f, -20.0f, 1.0f), -60.0f, "dB"));
     params.push_back(std::make_unique<AudioParameterBool>(ParameterID{"gateEnabled", 1}, "Silence Gate", false));
+    params.push_back(std::make_unique<AudioParameterBool>(ParameterID{"bypass", 1}, "Bypass", false));
     params.push_back(std::make_unique<AudioParameterBool>(ParameterID{"levelingEnabled", 1}, "Intelligent Leveling", true));
     params.push_back(std::make_unique<AudioParameterBool>(ParameterID{"gainRiding", 1}, "Automatic Gain Riding", true));
     params.push_back(std::make_unique<AudioParameterBool>(ParameterID{"deEsserEnabled", 1}, "De-esser", true));
@@ -43,6 +44,8 @@ void VocalDynamicsAudioProcessor::prepareToPlay(double sampleRate, int)
     smoothedCompressorGain = 1.0f;
     deEsserEnvelope = 0.0f;
     previousSamples = {{0.0f, 0.0f}};
+    previousDeEssSamples = {{0.0f, 0.0f}};
+    detectorEnvelope = 0.0f;
     loudnessEnergySum = 0.0;
     loudnessSamples = 0;
 }
@@ -80,6 +83,8 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         if (auto* p = parameters.getRawParameterValue(id)) return p->load(std::memory_order_relaxed);
         return fallback;
     };
+    const bool bypass = param("bypass") > 0.5f;
+    if (bypass) { measuredTruePeakDbtp.store(juce::Decibels::gainToDecibels(buffer.getMagnitude(0, samples)), std::memory_order_relaxed); return; }
     const bool enabled = param("levelingEnabled", 1.0f) > 0.5f;
     const bool riderEnabled = param("gainRiding", 1.0f) > 0.5f;
     const bool deEssEnabled = param("deEsserEnabled", 1.0f) > 0.5f;
@@ -93,6 +98,8 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     const float riderAttack = std::exp(-1.0f / static_cast<float>(0.035 * currentSampleRate));
     const float riderRelease = std::exp(-1.0f / static_cast<float>(0.240 * currentSampleRate));
+    const float detectorAttack = std::exp(-1.0f / static_cast<float>(0.025 * currentSampleRate));
+    const float detectorRelease = std::exp(-1.0f / static_cast<float>(0.180 * currentSampleRate));
     const float compAttack = std::exp(-1.0f / static_cast<float>(0.008 * currentSampleRate));
     const float compRelease = std::exp(-1.0f / static_cast<float>(0.100 * currentSampleRate));
     const float essRelease = std::exp(-1.0f / static_cast<float>(0.045 * currentSampleRate));
@@ -117,7 +124,10 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             }
             previousSamples[channel] = x;
         }
-        const float level = std::sqrt(detectorEnergy / static_cast<float>(juce::jmax(1, inputChannels)));
+        const float instantLevel = std::sqrt(detectorEnergy / static_cast<float>(juce::jmax(1, inputChannels)));
+        const float detectorCoefficient = instantLevel > detectorEnvelope ? detectorAttack : detectorRelease;
+        detectorEnvelope = instantLevel + detectorCoefficient * (detectorEnvelope - instantLevel);
+        const float level = detectorEnvelope;
 
         if (enabled && riderEnabled)
         {
@@ -150,10 +160,11 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 // Lightweight high-frequency transient detector. This is a basic
                 // de-essing stage, not a multiband or phoneme-aware de-esser.
                 const size_t channel = static_cast<size_t>(juce::jmin(ch, 1));
-                const float high = value - previousSamples[channel];
+                const float high = value - previousDeEssSamples[channel];
+                previousDeEssSamples[channel] = value;
                 deEsserEnvelope = juce::jmax(std::abs(high), essRelease * deEsserEnvelope);
-                const float reduction = 1.0f - juce::jlimit(0.0f, 0.45f,
-                    deEssAmount * juce::jmax(0.0f, deEsserEnvelope - 0.018f) * 3.0f);
+                const float reduction = 1.0f - juce::jlimit(0.0f, 0.35f,
+                    deEssAmount * juce::jmax(0.0f, deEsserEnvelope - 0.035f) * 2.0f);
                 value *= reduction;
             }
 
