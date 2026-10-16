@@ -168,10 +168,12 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
     addWordButton.onClick = [this] { createWordEventFromSelection(); };
+    zoomInButton.setButtonText("+");
+    zoomOutButton.setButtonText("-"); // ASCII hyphen avoids unsupported-glyph boxes on Windows.
     zoomInButton.setTooltip("Zoom in");
     zoomOutButton.setTooltip("Zoom out");
-    zoomInButton.onClick = [this] { zoomBy(0.8); };
-    zoomOutButton.onClick = [this] { zoomBy(1.25); };
+    zoomInButton.onClick = [this] { zoomBy(0.85); };
+    zoomOutButton.onClick = [this] { zoomBy(1.1764705882); };
     whisperExeButton.onClick = [this] { chooseWhisperExecutable(); };
     whisperModelButton.onClick = [this] { chooseWhisperModel(); };
     transcribeButton.onClick = [this] { startTranscription(); };
@@ -567,8 +569,11 @@ void VocalDynamicsStandaloneEditor::zoomBy(double factor)
     // Fit-to-window is 100% (the full file); maximum magnification is 100x.
     const double minimumSpan = juce::jmax(0.05, total / 100.0);
     const double newSpan = juce::jlimit(minimumSpan, total, oldSpan * factor);
-    const double anchor = juce::jlimit(0.0, total, transport.getCurrentPosition());
-    const double anchorRatio = (anchor - viewStartSeconds) / juce::jmax(0.001, oldSpan);
+    // Keep the center of the visible timeline stable while zooming. The old
+    // implementation anchored to the playhead, which made the waveform appear
+    // to jump relative to the mouse/click location.
+    const double anchor = juce::jlimit(0.0, total, viewStartSeconds + oldSpan * 0.5);
+    const double anchorRatio = 0.5;
     double newStart = anchor - anchorRatio * newSpan;
     newStart = juce::jlimit(0.0, juce::jmax(0.0, total - newSpan), newStart);
     viewStartSeconds = newStart;
@@ -579,9 +584,13 @@ void VocalDynamicsStandaloneEditor::zoomBy(double factor)
 
 void VocalDynamicsStandaloneEditor::updateZoomLabel()
 {
-    // The toolbar label is intentionally language-neutral and stays concise.
-    // Zoom percentage is omitted: the user asked for a simple ZOOM label and +/- buttons.
-    zoomLabel.setText("ZOOM", juce::dontSendNotification);
+    const double total = thumbnail.getTotalLength();
+    const double span = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
+    // UI zoom meter is clamped to a clear 0–100 scale: 0 = full file fit,
+    // 100 = maximum supported magnification. It never shows 200–800% values.
+    const double fraction = total > 0.0 ? 1.0 - span / total : 0.0;
+    const int percent = juce::jlimit(0, 100, static_cast<int>(std::round(fraction * 100.0)));
+    zoomLabel.setText("ZOOM " + juce::String(percent) + "%", juce::dontSendNotification);
 }
 
 bool VocalDynamicsStandaloneEditor::keyPressed(const juce::KeyPress& key)
@@ -593,13 +602,13 @@ bool VocalDynamicsStandaloneEditor::keyPressed(const juce::KeyPress& key)
     }
     if (key.getTextCharacter() == '+' || key.getKeyCode() == juce::KeyPress::numberPadAdd)
     {
-        zoomBy(0.5);
+        zoomBy(0.85);
         return true;
     }
     if (key.getTextCharacter() == '-' || key.getTextCharacter() == '_' ||
         key.getKeyCode() == juce::KeyPress::numberPadSubtract)
     {
-        zoomBy(2.0);
+        zoomBy(1.1764705882);
         return true;
     }
     if (key.getKeyCode() == juce::KeyPress::escapeKey)
@@ -624,7 +633,7 @@ void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
         return;
     }
 
-    if (event.y >= 450 && event.y <= 625)
+    if (event.y >= 450 && event.y <= 534)
         selectEventAt(event.getPosition());
 }
 
@@ -694,8 +703,8 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
     const double visibleStart = viewStartSeconds;
     const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
     const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
-    const int laneX = 42;
-    const int laneWidth = getWidth() - 84;
+    const int laneX = waveformBounds().getX() + 12;
+    const int laneWidth = waveformBounds().getWidth() - 24;
     for (int i = static_cast<int>(wordEvents.size()) - 1; i >= 0; --i)
     {
         const auto& e = wordEvents[static_cast<size_t>(i)];
@@ -920,8 +929,8 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         const double visibleStart = viewStartSeconds;
         const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
         const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
-        const int laneX = 42;
-        const int laneWidth = getWidth() - 84;
+        const int laneX = waveformBounds().getX() + 12;
+        const int laneWidth = waveformBounds().getWidth() - 24;
         for (int i = 0; i < static_cast<int>(wordEvents.size()); ++i)
         {
             const auto& e = wordEvents[static_cast<size_t>(i)];
