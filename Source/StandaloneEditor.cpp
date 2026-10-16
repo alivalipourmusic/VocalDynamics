@@ -116,6 +116,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     formatManager.registerBasicFormats();
     thumbnail.addChangeListener(this);
     readAheadThread.startThread();
+    recordingThread.startThread();
     eventGainSource.setEvents(&wordEvents);
 
     const auto white = juce::Colour(0xffedf7ff);
@@ -175,7 +176,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
     addAndMakeVisible(wordGainSlider);
 
-    for (auto* button : { &importButton, &settingsButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
+    for (auto* button : { &importButton, &recordButton, &settingsButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
     {
         button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1a2940));
         button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff245e5a));
@@ -189,11 +190,14 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
         addAndMakeVisible(*button);
     }
     importButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1b665b));
+    recordButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff9e3347));
+    recordButton.setTooltip("Record from the selected audio-device input and save a WAV take.");
     transcribeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff6d4ed8));
     exportButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff253751));
     playButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff174e48));
 
     importButton.onClick = [this] { chooseFile(); };
+    recordButton.onClick = [this] { toggleRecording(); };
     analysisButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff6d4ed8));
     analysisButton.setColour(juce::TextButton::textColourOffId, white);
     analysisButton.onClick = [this] { analyzeTempoAndKey(); };
@@ -257,12 +261,13 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     setWantsKeyboardFocus(true);
     setFocusContainerType(juce::Component::FocusContainerType::keyboardFocusContainer);
 
-    const auto setupResult = deviceManager.initialiseWithDefaultDevices(0, 2);
+    const auto setupResult = deviceManager.initialiseWithDefaultDevices(2, 2);
     if (setupResult.isNotEmpty())
         status.setText("Audio device error: " + setupResult, juce::dontSendNotification);
 
     audioSourcePlayer.setSource(&eventGainSource);
     deviceManager.addAudioCallback(&audioSourcePlayer);
+    deviceManager.addAudioCallback(this);
     refreshAudioStatus();
     startTimerHz(20);
     setSize(1240, 880);
@@ -274,12 +279,15 @@ VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
         transcriptionWorker->stopThread(3000);
     stopTimer();
     thumbnail.removeChangeListener(this);
+    stopRecording();
+    deviceManager.removeAudioCallback(this);
     deviceManager.removeAudioCallback(&audioSourcePlayer);
     audioSourcePlayer.setSource(nullptr);
     transport.stop();
     transport.setSource(nullptr);
     readerSource.reset();
     readAheadThread.stopThread(2000);
+    recordingThread.stopThread(2000);
 }
 
 bool VocalDynamicsStandaloneEditor::isInterestedInFileDrag(const juce::StringArray& files)
@@ -1150,6 +1158,112 @@ void VocalDynamicsStandaloneEditor::timerCallback()
     repaint();
 }
 
+void VocalDynamicsStandaloneEditor::audioDeviceAboutToStart(juce::AudioIODevice* device)
+{
+    if (device != nullptr && device->getCurrentSampleRate() > 0.0)
+        recordingSampleRate = device->getCurrentSampleRate();
+}
+
+void VocalDynamicsStandaloneEditor::audioDeviceStopped()
+{
+    stopRecording();
+}
+
+void VocalDynamicsStandaloneEditor::audioDeviceIOCallbackWithContext(
+    const float* const* inputChannelData, int numInputChannels,
+    float* const* outputChannelData, int numOutputChannels, int numSamples,
+    const juce::AudioIODeviceCallbackContext&)
+{
+    juce::ignoreUnused(outputChannelData, numOutputChannels);
+    const juce::ScopedLock lock(recordingLock);
+    if (!recordingActive || recordingWriter == nullptr || inputChannelData == nullptr || numInputChannels <= 0)
+        return;
+    int channel = 0;
+    while (channel < numInputChannels && inputChannelData[channel] == nullptr)
+        ++channel;
+    if (channel >= numInputChannels)
+        return;
+    const float* channels[] = { inputChannelData[channel] };
+    recordingWriter->write(channels, 1, numSamples);
+}
+
+void VocalDynamicsStandaloneEditor::toggleRecording()
+{
+    if (recordingActive)
+    {
+        stopRecording();
+        return;
+    }
+    auto* device = deviceManager.getCurrentAudioDevice();
+    if (device == nullptr || device->getActiveInputChannels().isZero())
+    {
+        status.setText("Recording unavailable: enable an input in AUDIO DEVICE settings.", juce::dontSendNotification);
+        openAudioSettings();
+        return;
+    }
+
+    recordingChooser = std::make_unique<juce::FileChooser>(
+        "Save vocal recording", juce::File::getSpecialLocation(juce::File::userMusicDirectory)
+            .getChildFile("Vocal Editor Take.wav"), "*.wav");
+    const auto flags = juce::FileBrowserComponent::saveMode
+        | juce::FileBrowserComponent::canSelectFiles
+        | juce::FileBrowserComponent::warnAboutOverwriting;
+    recordingChooser->launchAsync(flags, [this](const juce::FileChooser& chooser)
+    {
+        const auto chosen = chooser.getResult();
+        if (chosen == juce::File())
+            return;
+        const auto output = chosen.withFileExtension(".wav");
+        if (output.existsAsFile() && !output.deleteFile())
+        {
+            status.setText("Could not replace the selected recording file.", juce::dontSendNotification);
+            return;
+        }
+        const double rate = recordingSampleRate > 0.0 ? recordingSampleRate : 44100.0;
+        auto stream = std::unique_ptr<juce::FileOutputStream>(output.createOutputStream());
+        if (stream == nullptr)
+        {
+            status.setText("Could not create WAV file. Choose another location.", juce::dontSendNotification);
+            return;
+        }
+        auto* format = formatManager.findFormatForFileExtension(".wav");
+        auto* writer = format != nullptr ? format->createWriterFor(stream.release(), rate, 1, 24, {}, 0) : nullptr;
+        if (writer == nullptr)
+        {
+            status.setText("Could not initialize WAV recording.", juce::dontSendNotification);
+            return;
+        }
+        lastRecordingFile = output;
+        {
+            const juce::ScopedLock lock(recordingLock);
+            recordingWriter = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
+                std::unique_ptr<juce::AudioFormatWriter>(writer), recordingThread, 32768);
+            recordingActive = true;
+        }
+        recordButton.setButtonText("■ STOP REC");
+        status.setText("Recording input at " + juce::String(rate, 0) + " Hz — press STOP REC to finish.", juce::dontSendNotification);
+        repaint();
+    });
+}
+
+void VocalDynamicsStandaloneEditor::stopRecording()
+{
+    {
+        const juce::ScopedLock lock(recordingLock);
+        if (!recordingActive && recordingWriter == nullptr)
+            return;
+        recordingActive = false;
+        recordingWriter.reset();
+    }
+    if (lastRecordingFile.existsAsFile() && lastRecordingFile.getSize() > 44)
+    {
+        status.setText("Recording saved: " + lastRecordingFile.getFileName(), juce::dontSendNotification);
+        loadFile(lastRecordingFile);
+    }
+    recordButton.setButtonText("● RECORD");
+    repaint();
+}
+
 void VocalDynamicsStandaloneEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
 {
     if (source == &thumbnail)
@@ -1472,7 +1586,9 @@ void VocalDynamicsStandaloneEditor::resized()
     zoomOutButton.setButtonText("-");
     zoomInButton.setButtonText("+");
 
-    importButton.setBounds(width - 422, 34, 78, 36);
+    importButton.setBounds(width - 520, 34, 72, 36);
+    recordButton.setButtonText(recordingActive ? "■ STOP REC" : "● RECORD");
+    recordButton.setBounds(width - 442, 34, 98, 36);
     playButton.setBounds(width - 338, 34, 74, 36);
     stopButton.setBounds(width - 258, 34, 58, 36);
     zoomOutButton.setBounds(width - 190, 34, 30, 36);
