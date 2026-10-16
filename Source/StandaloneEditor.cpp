@@ -1,3 +1,6 @@
+#include <array>
+#include <algorithm>
+#include <cmath>
 #include "StandaloneEditor.h"
 
 namespace
@@ -203,8 +206,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     zoomOutButton.setTooltip("Zoom out");
     zoomInButton.onClick = [this] { zoomBy(0.80); };
     zoomOutButton.onClick = [this] { zoomBy(1.25); };
-    whisperExeButton.setButtonText("CHOOSE SPEECH ENGINE");
-    whisperModelButton.setButtonText("CHOOSE LANGUAGE MODEL");
+    whisperExeButton.setButtonText("CHOOSE SPEECH APP");
+    whisperModelButton.setButtonText("CHOOSE LANGUAGE PACK");
     transcribeButton.setButtonText("DETECT WORDS");
     whisperExeButton.setTooltip("Choose whisper-cli.exe, the offline speech-recognition program.");
     whisperModelButton.setTooltip("Choose a multilingual Whisper model file (.bin).");
@@ -533,6 +536,7 @@ void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
     currentFile = file;
     viewStartSeconds = 0.0;
     viewEndSeconds = readerSource->getTotalLength();
+    updateZoomLabel();
     wordEvents.clear();
     selectedEvent = -1;
     selectedWordLabel.setText("No region selected", juce::dontSendNotification);
@@ -1236,7 +1240,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                          static_cast<float>(inspector.getRight() - 12));
     g.setColour(muted);
     g.setFont(10.5f);
-    g.drawText("SELECTED WORD / REGION", inspector.getX() + 14, inspector.getY() + 49,
+    g.drawText("SELECTED WORD / REGION", inspector.getX() + 14, inspector.getY() + 47,
                inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
     g.drawText("GAIN", inspector.getX() + 14, inspector.getY() + 153,
                inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
@@ -1253,10 +1257,10 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                inspector.getWidth() - 26, 18, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.0f);
-    g.drawText("Optional: set up offline speech recognition once,",
+    g.drawText("Choose a speech app and language pack once,",
                inspector.getX() + 14, inspector.getY() + 285, inspector.getWidth() - 24, 14,
                juce::Justification::centredLeft);
-    g.drawText("then use Detect Words to create timed regions.",
+    g.drawText("then press Detect Words to create timed regions.",
                inspector.getX() + 14, inspector.getY() + 300, inspector.getWidth() - 24, 14,
                juce::Justification::centredLeft);
 
@@ -1308,7 +1312,7 @@ void VocalDynamicsStandaloneEditor::resized()
     zoomLabel.setBounds(width - 112, 34, 48, 36);
     zoomInButton.setBounds(width - 58, 34, 30, 36);
 
-    selectedWordLabel.setBounds(inspectorX + 12, 202, inspectorW - 24, 32);
+    selectedWordLabel.setBounds(inspectorX + 12, 210, inspectorW - 24, 30);
     gainValueLabel.setBounds(inspectorX + 12, 310, inspectorW - 24, 26);
     wordGainSlider.setBounds(inspectorX + 12, 336, inspectorW - 24, 68);
     settingsButton.setButtonText("AUDIO DEVICE SETTINGS");
