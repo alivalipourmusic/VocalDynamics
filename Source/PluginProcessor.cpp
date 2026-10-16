@@ -37,9 +37,14 @@ VocalDynamicsAudioProcessor::VocalDynamicsAudioProcessor()
 
 const juce::String VocalDynamicsAudioProcessor::getName() const { return "Vocal Dynamics"; }
 
-void VocalDynamicsAudioProcessor::prepareToPlay(double sampleRate, int)
+void VocalDynamicsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = juce::jmax(8000.0, sampleRate);
+    const auto channels = static_cast<size_t>(juce::jmax(1, getTotalNumInputChannels()));
+    truePeakOversampler = std::make_unique<juce::dsp::Oversampling<float>>(
+        channels, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false);
+    truePeakOversampler->initProcessing(static_cast<size_t>(juce::jmax(1, samplesPerBlock)));
+    truePeakOversampler->reset();
     gainRiderDb = 0.0f;
     smoothedCompressorGain = 1.0f;
     deEsserEnvelope = 0.0f;
@@ -50,7 +55,7 @@ void VocalDynamicsAudioProcessor::prepareToPlay(double sampleRate, int)
     loudnessSamples = 0;
 }
 
-void VocalDynamicsAudioProcessor::releaseResources() {}
+void VocalDynamicsAudioProcessor::releaseResources() { truePeakOversampler.reset(); }
 
 bool VocalDynamicsAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
@@ -189,6 +194,17 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             std::memory_order_relaxed);
         loudnessEnergySum = 0.0;
         loudnessSamples = 0;
+    }
+    // Polyphase-IIR oversampling estimates reconstructed inter-sample peaks.
+    if (truePeakOversampler != nullptr && samples > 0)
+    {
+        juce::dsp::AudioBlock<float> inputBlock(buffer);
+        auto oversampledBlock = truePeakOversampler->processSamplesUp(inputBlock);
+        float oversampledPeak = 0.0f;
+        for (size_t channel = 0; channel < oversampledBlock.getNumChannels(); ++channel)
+            for (size_t sample = 0; sample < oversampledBlock.getNumSamples(); ++sample)
+                oversampledPeak = juce::jmax(oversampledPeak, std::abs(oversampledBlock.getSample(channel, sample)));
+        blockTruePeak = juce::jmax(blockTruePeak, oversampledPeak);
     }
     measuredTruePeakDbtp.store(juce::Decibels::gainToDecibels(blockTruePeak), std::memory_order_relaxed);
     measuredGainReductionDb.store(juce::Decibels::gainToDecibels(juce::jmax(smoothedCompressorGain, 1.0e-5f)),
