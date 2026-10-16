@@ -1184,10 +1184,10 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.drawText("VOCAL", 28, 14, 104, 29, juce::Justification::centredLeft);
     g.setColour(cyan);
     g.setFont(juce::Font("Aptos Display", 20.0f, juce::Font::bold));
-    g.drawText("DYNAMICS", 28, 43, 140, 24, juce::Justification::centredLeft);
+    g.drawText("EDITOR", 28, 43, 140, 24, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.5f);
-    g.drawText("VOCAL CONTROL  /  STUDIO SUITE", 28, 75, 260, 16, juce::Justification::centredLeft);
+    g.drawText("PRECISION VOCAL WORKSTATION", 28, 75, 250, 16, juce::Justification::centredLeft);
 
     g.setColour(edge);
     g.drawHorizontalLine(111, 0.0f, static_cast<float>(getWidth()));
@@ -1452,37 +1452,47 @@ void VocalDynamicsStandaloneEditor::resized()
 {
     const int width = getWidth();
     const int height = getHeight();
-    const int inspectorX = waveformBounds().getRight() + 28;
-    const int inspectorW = juce::jmax(210, width - inspectorX - 24);
+    const auto wave = waveformBounds();
+    const int inspectorX = wave.getRight() + 14;
+    const int inspectorW = juce::jmax(220, width - inspectorX - 24);
+    const int innerX = inspectorX + 14;
+    const int innerW = juce::jmax(180, inspectorW - 28);
 
-    title.setVisible(false);
-    status.setVisible(false);
-    timeLabel.setVisible(false);
+    // All controls are positioned from shared panel geometry so labels, buttons,
+    // and interactive widgets cannot drift apart as the window is resized.
     status.setBounds(32, height - 28, width - 48, 20);
-    timeLabel.setBounds(270, 34, 220, 28);
+    timeLabel.setBounds(285, 34, 220, 28);
 
-    importButton.setBounds(width - 422, 34, 116, 36);
-    playButton.setBounds(width - 300, 34, 82, 36);
-    stopButton.setBounds(width - 212, 34, 58, 36);
-    zoomOutButton.setBounds(width - 146, 34, 30, 36);
-    zoomLabel.setBounds(width - 112, 34, 48, 36);
-    zoomInButton.setBounds(width - 58, 34, 30, 36);
+    importButton.setButtonText("IMPORT");
+    playButton.setButtonText(transport.isPlaying() ? "PAUSE" : "PLAY");
+    settingsButton.setButtonText("AUDIO DEVICE");
+    whisperExeButton.setButtonText("CHOOSE SPEECH APP");
+    whisperModelButton.setButtonText("CHOOSE MODEL");
+    transcribeButton.setButtonText("DETECT WORDS");
+    zoomOutButton.setButtonText("-");
+    zoomInButton.setButtonText("+");
 
-    selectedWordLabel.setBounds(inspectorX + 12, 210, inspectorW - 24, 30);
-    gainValueLabel.setBounds(inspectorX + 12, 310, inspectorW - 24, 26);
-    wordGainSlider.setBounds(inspectorX + 12, 336, inspectorW - 24, 68);
-    settingsButton.setButtonText("AUDIO DEVICE SETTINGS");
-    settingsButton.setBounds(inspectorX + 12, 410, inspectorW - 24, 28);
-    exportButton.setBounds(inspectorX + 12, 444, inspectorW - 24, 28);
-    whisperExeButton.setBounds(inspectorX + 12, 490, inspectorW - 24, 24);
-    whisperModelButton.setBounds(inspectorX + 12, 518, inspectorW - 24, 24);
-    transcribeButton.setBounds(inspectorX + 12, 546, inspectorW - 24, 28);
+    importButton.setBounds(width - 422, 34, 78, 36);
+    playButton.setBounds(width - 338, 34, 74, 36);
+    stopButton.setBounds(width - 258, 34, 58, 36);
+    zoomOutButton.setBounds(width - 190, 34, 30, 36);
+    zoomLabel.setBounds(width - 154, 34, 54, 36);
+    zoomInButton.setBounds(width - 94, 34, 30, 36);
+
+    selectedWordLabel.setBounds(innerX, 210, innerW, 30);
+    gainValueLabel.setBounds(innerX, 310, innerW, 24);
+    wordGainSlider.setBounds(innerX, 336, innerW, 72);
+    settingsButton.setBounds(innerX, 410, innerW, 28);
+    exportButton.setBounds(innerX, 444, innerW, 28);
+    whisperExeButton.setBounds(innerX, 490, innerW, 26);
+    whisperModelButton.setBounds(innerX, 520, innerW, 26);
+    transcribeButton.setBounds(innerX, 550, innerW, 28);
     addWordButton.setVisible(false);
 
-    analysisLabel.setBounds(waveformBounds().getX() + 14, 612,
-                            waveformBounds().getWidth() - 210, 24);
-    analysisButton.setBounds(waveformBounds().getRight() - 180, 598, 164, 48);
-    rootNoteBox.setBounds(waveformBounds().getX() + 150, 678, 76, 28);
-    scaleBox.setBounds(waveformBounds().getX() + 234, 678, 150, 28);
-    pitchAnalysisButton.setBounds(waveformBounds().getX() + 394, 678, 140, 28);
+    analysisLabel.setBounds(wave.getX() + 14, 612, juce::jmax(160, wave.getWidth() - 210), 24);
+    analysisButton.setBounds(wave.getRight() - 180, 598, 164, 48);
+    rootNoteBox.setBounds(wave.getX() + 150, 678, 76, 28);
+    scaleBox.setBounds(wave.getX() + 234, 678, 150, 28);
+    pitchAnalysisButton.setBounds(wave.getX() + 394, 678, 140, 28);
 }
+
