@@ -49,6 +49,17 @@ private:
     juce::TextButton playButton { "PLAY" };
 
     juce::Slider gainSlider;
+    juce::Slider targetLufsSlider;
+    juce::TextButton engineButton { "LEVELING ON" };
+    juce::TextButton riderButton { "GAIN RIDING ON" };
+    juce::TextButton deEsserButton { "DE-ESSER ON" };
+    juce::TextButton bypassButton { "BYPASS OFF" };
+
+    std::unique_ptr<SliderAttachment> targetLufsAttachment;
+    std::unique_ptr<ButtonAttachment> engineAttachment;
+    std::unique_ptr<ButtonAttachment> riderAttachment;
+    std::unique_ptr<ButtonAttachment> deEsserAttachment;
+    std::unique_ptr<ButtonAttachment> bypassAttachment;
 
     std::unique_ptr<SliderAttachment> gainAttachment;
 
