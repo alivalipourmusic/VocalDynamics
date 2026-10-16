@@ -986,6 +986,69 @@ void VocalDynamicsStandaloneEditor::analyzeTempoAndKey()
     repaint();
 }
 
+bool VocalDynamicsStandaloneEditor::pitchClassAllowed(int midiNote) const
+{
+    static const int intervals[9][7] = {
+        {0,2,4,5,7,9,11}, {0,2,3,5,7,8,10}, {0,2,3,5,7,8,11},
+        {0,2,3,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10},
+        {0,2,4,5,7,9,10}, {0,2,4,7,9,-1,-1}, {0,3,5,7,10,-1,-1}
+    };
+    const int pc = (midiNote % 12 + 12) % 12;
+    const int relative = (pc - selectedRootNote + 12) % 12;
+    for (int i = 0; i < 7; ++i) if (intervals[juce::jlimit(0, 8, selectedScale)][i] == relative) return true;
+    return false;
+}
+
+void VocalDynamicsStandaloneEditor::analyzePitchNotes()
+{
+    if (!currentFile.existsAsFile()) { status.setText("Load an audio file before analyzing pitch notes.", juce::dontSendNotification); return; }
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(currentFile));
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0) { status.setText("Could not read the audio file for pitch analysis.", juce::dontSendNotification); return; }
+    const auto limit = static_cast<juce::int64>(reader->sampleRate * 30.0);
+    const int count = static_cast<int>(juce::jmin<juce::int64>(reader->lengthInSamples, limit));
+    juce::AudioBuffer<float> source(1, count);
+    if (!reader->read(&source, 0, count, 0, true, false)) { status.setText("Could not read audio samples for pitch analysis.", juce::dontSendNotification); return; }
+    const int stride = juce::jmax(1, static_cast<int>(std::ceil(reader->sampleRate / 11025.0)));
+    const double rate = reader->sampleRate / static_cast<double>(stride);
+    std::vector<float> mono; mono.reserve(static_cast<size_t>(count / stride + 1));
+    const auto* in = source.getReadPointer(0);
+    for (int i = 0; i < count; i += stride) mono.push_back(in[i]);
+    constexpr int frame = 1024, hop = 256;
+    const int minLag = static_cast<int>(rate / 1000.0);
+    const int maxLag = juce::jmin(frame / 2, static_cast<int>(rate / 75.0));
+    if (mono.size() < frame || minLag < 2 || maxLag <= minLag) { status.setText("Audio is too short for pitch analysis.", juce::dontSendNotification); return; }
+    std::vector<PitchNote> found;
+    for (size_t start = 0; start + frame < mono.size(); start += hop)
+    {
+        double energy = 0.0;
+        for (int i = 0; i < frame; ++i) { const double v = mono[start + static_cast<size_t>(i)]; energy += v * v; }
+        if (std::sqrt(energy / frame) < 0.008) continue;
+        double best = 0.0; int bestLag = 0;
+        for (int lag = minLag; lag <= maxLag; ++lag)
+        {
+            double cross = 0.0, e1 = 0.0, e2 = 0.0;
+            for (int i = 0; i < frame - lag; ++i)
+            {
+                const double a = mono[start + static_cast<size_t>(i)], b = mono[start + static_cast<size_t>(i + lag)];
+                cross += a * b; e1 += a * a; e2 += b * b;
+            }
+            const double corr = cross / std::sqrt(juce::jmax(1.0e-15, e1 * e2));
+            if (corr > best) { best = corr; bestLag = lag; }
+        }
+        if (bestLag == 0 || best < 0.72) continue;
+        const double hz = rate / bestLag;
+        if (hz < 75.0 || hz > 1000.0) continue;
+        const int midi = static_cast<int>(std::round(69.0 + 12.0 * std::log2(hz / 440.0)));
+        const double t0 = static_cast<double>(start) / rate, t1 = static_cast<double>(start + frame) / rate;
+        if (!found.empty() && found.back().midiNote == midi && t0 - found.back().endSeconds <= static_cast<double>(hop * 2) / rate)
+        { found.back().endSeconds = t1; found.back().confidence = juce::jmax(found.back().confidence, static_cast<float>(best)); }
+        else found.push_back({t0, t1, midi, static_cast<float>(best)});
+    }
+    pitchNotes = std::move(found);
+    status.setText("Pitch analysis finished: " + juce::String(static_cast<int>(pitchNotes.size())) + " note regions. Monophonic estimate only; verify by ear.", juce::dontSendNotification);
+    repaint();
+}
+
 void VocalDynamicsStandaloneEditor::exportProcessedAudio()
 {
     if (!currentFile.existsAsFile())
@@ -1347,9 +1410,9 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         const double span = juce::jmax(0.001, visibleEnd - visibleStart);
         const int plotTop = pitchLane.getY() + 54;
         const int plotHeight = pitchLane.getHeight() - 64;
-        for (int semitone = 0; semitone < 25; ++semitone)
+        for (int semitone = 0; semitone < 37; ++semitone)
         {
-            const int y = plotTop + semitone * plotHeight / 24;
+            const int y = plotTop + semitone * plotHeight / 36;
             g.setColour(juce::Colour(0xff243149));
             g.drawHorizontalLine(y, static_cast<float>(pitchLane.getX() + 8), static_cast<float>(pitchLane.getRight() - 8));
         }
@@ -1358,8 +1421,8 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             if (note.endSeconds < visibleStart || note.startSeconds > visibleEnd) continue;
             const int x1 = pitchLane.getX() + 8 + static_cast<int>((note.startSeconds - visibleStart) / span * (pitchLane.getWidth() - 16));
             const int x2 = pitchLane.getX() + 8 + static_cast<int>((note.endSeconds - visibleStart) / span * (pitchLane.getWidth() - 16));
-            const int midiClamped = juce::jlimit(48, 72, note.midiNote);
-            const int y = plotTop + (72 - midiClamped) * plotHeight / 24;
+            const int midiClamped = juce::jlimit(48, 84, note.midiNote);
+            const int y = plotTop + (84 - midiClamped) * plotHeight / 36;
             const bool inScale = pitchClassAllowed(note.midiNote);
             const auto noteColour = inScale ? juce::Colour(0xff2dd4a7) : juce::Colour(0xfff06464);
             g.setColour(noteColour.withAlpha(0.22f));
