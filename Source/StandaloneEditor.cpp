@@ -153,7 +153,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
     addAndMakeVisible(wordGainSlider);
 
-    for (auto* button : { &importButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
+    for (auto* button : { &importButton, &settingsButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
     {
         button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff164252));
         button->setColour(juce::TextButton::textColourOffId, white);
@@ -161,6 +161,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     }
 
     importButton.onClick = [this] { chooseFile(); };
+    settingsButton.onClick = [this] { openAudioSettings(); };
     playButton.onClick = [this] { togglePlayback(); };
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
@@ -179,6 +180,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
     audioSourcePlayer.setSource(&eventGainSource);
     deviceManager.addAudioCallback(&audioSourcePlayer);
+    refreshAudioStatus();
     startTimerHz(20);
     setSize(1100, 720);
 }
@@ -214,6 +216,46 @@ void VocalDynamicsStandaloneEditor::filesDropped(const juce::StringArray& files,
     if (!files.isEmpty())
         loadFile(juce::File(files[0]));
     repaint();
+}
+
+void VocalDynamicsStandaloneEditor::openAudioSettings()
+{
+    // JUCE's device selector exposes available audio interfaces, output channels,
+    // and supported sample rates. Changes are applied to this AudioDeviceManager.
+    auto* selector = new juce::AudioDeviceSelectorComponent(
+        deviceManager, 0, 0, 1, 2, true, true, true, false);
+    selector->setSize(620, 460);
+
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(selector);
+    options.dialogTitle = "Vocal Dynamics - Audio Settings";
+    options.dialogBackgroundColour = juce::Colour(0xff111f2d);
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = true;
+    options.resizable = true;
+    options.componentToCentreAround = this;
+    options.launchAsync();
+
+    juce::Timer::callAfterDelay(400, [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this)]
+    {
+        if (safeThis != nullptr) safeThis->refreshAudioStatus();
+    });
+}
+
+void VocalDynamicsStandaloneEditor::refreshAudioStatus()
+{
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+    {
+        status.setText("Audio: " + device->getName() + " | "
+                       + juce::String(device->getCurrentSampleRate(), 0) + " Hz | "
+                       + juce::String(device->getCurrentBufferSizeSamples()) + " samples",
+                       juce::dontSendNotification);
+    }
+    else
+    {
+        status.setText("No audio output device selected. Open AUDIO SETTINGS and choose your interface.",
+                       juce::dontSendNotification);
+    }
 }
 
 void VocalDynamicsStandaloneEditor::chooseFile()
@@ -434,11 +476,20 @@ void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
     selectedWordLabel.setText("No region selected", juce::dontSendNotification);
     wordGainSlider.setValue(0.0, juce::dontSendNotification);
     thumbnail.clear();
+    // Use an explicit change notification after setting the source so the first
+    // waveform is drawn immediately rather than only after a later zoom repaint.
     const bool waveformStarted = thumbnail.setSource(new juce::FileInputSource(file));
     playButton.setButtonText("PLAY");
-    status.setText(waveformStarted ? "Loaded: " + file.getFileName()
-                                   : "Audio loaded; waveform preview could not be opened.",
-                   juce::dontSendNotification);
+    if (waveformStarted)
+    {
+        thumbnail.sendChangeMessage();
+        status.setText("Loaded: " + file.getFileName(), juce::dontSendNotification);
+    }
+    else
+    {
+        status.setText("Audio loaded; waveform preview is still loading or unavailable.", juce::dontSendNotification);
+    }
+    refreshAudioStatus();
     repaint();
 }
 
@@ -893,13 +944,14 @@ void VocalDynamicsStandaloneEditor::resized()
     status.setBounds(32, 62, 600, 25);
     timeLabel.setBounds(32, 112, 220, 24);
 
-    importButton.setBounds(width - 530, 32, 125, 42);
-    playButton.setBounds(width - 395, 32, 105, 42);
-    stopButton.setBounds(width - 280, 32, 65, 42);
-    zoomOutButton.setBounds(width - 205, 32, 38, 42);
-    zoomLabel.setBounds(width - 165, 32, 55, 42);
-    zoomInButton.setBounds(width - 105, 32, 38, 42);
-    exportButton.setBounds(width - 530, 112, 125, 30);
+    importButton.setBounds(width - 650, 32, 125, 42);
+    playButton.setBounds(width - 515, 32, 105, 42);
+    stopButton.setBounds(width - 400, 32, 65, 42);
+    zoomOutButton.setBounds(width - 325, 32, 38, 42);
+    zoomLabel.setBounds(width - 285, 32, 55, 42);
+    zoomInButton.setBounds(width - 225, 32, 38, 42);
+    settingsButton.setBounds(width - 180, 32, 150, 42);
+    exportButton.setBounds(width - 650, 112, 125, 30);
 
     selectedWordLabel.setBounds(44, 568, 190, 30);
     wordGainSlider.setBounds(width - 290, 562, 145, 88);
