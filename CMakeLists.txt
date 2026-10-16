@@ -19,7 +19,7 @@ juce_add_plugin(VocalDynamics
     PLUGIN_CODE Vdyn
     FORMATS VST3 Standalone
     VST3_CAN_REPLACE_VST2 TRUE
-    PRODUCT_NAME "Vocal Dynamics"
+    PRODUCT_NAME "Vocal Editor"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
@@ -55,7 +55,7 @@ target_link_libraries(VocalDynamics
 
 # Separate desktop editor for opening, previewing and playing vocal files.
 juce_add_gui_app(VocalDynamicsEditor
-    PRODUCT_NAME "Vocal Dynamics Editor"
+    PRODUCT_NAME "Vocal Editor"
     COMPANY_NAME "Avlirecordlabel"
     VERSION "0.1.0"
 )
