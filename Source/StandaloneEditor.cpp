@@ -828,7 +828,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         g.drawText("IMPORT A VOCAL FILE TO VIEW ITS WAVEFORM", waveArea.reduced(20, 20), juce::Justification::centred);
     }
 
-    juce::Rectangle<float> eventArea(30.0f, 450.0f, static_cast<float>(getWidth() - 60), 175.0f);
+    juce::Rectangle<float> eventArea(30.0f, 450.0f, static_cast<float>(getWidth() - 60), 84.0f);
     g.setColour(juce::Colour(0xff0c1824));
     g.fillRoundedRectangle(eventArea, 10.0f);
     g.setColour(border);
@@ -859,8 +859,8 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             const auto& e = wordEvents[static_cast<size_t>(i)];
             const int x1 = laneX + static_cast<int>((e.startSeconds - visibleStart) / visibleSpan * laneWidth);
             const int x2 = laneX + static_cast<int>((e.endSeconds - visibleStart) / visibleSpan * laneWidth);
-            juce::Rectangle<float> block(static_cast<float>(x1), 500.0f,
-                                         static_cast<float>(juce::jmax(8, x2 - x1)), 46.0f);
+            juce::Rectangle<float> block(static_cast<float>(x1), 488.0f,
+                                         static_cast<float>(juce::jmax(8, x2 - x1)), 30.0f);
             g.setColour(i == selectedEvent ? juce::Colour(0xff246e7b) : juce::Colour(0xff263b54));
             g.fillRoundedRectangle(block, 5.0f);
             g.setColour(i == selectedEvent ? cyan : border);
@@ -872,10 +872,18 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         }
     }
 
+    // Dedicated edit strip keeps the gain control clear of the event lane.
+    juce::Rectangle<float> editArea(30.0f, 545.0f, static_cast<float>(getWidth() - 60), 122.0f);
+    g.setColour(juce::Colour(0xff132332));
+    g.fillRoundedRectangle(editArea, 10.0f);
+    g.setColour(border);
+    g.drawRoundedRectangle(editArea, 10.0f, 1.0f);
     g.setColour(muted);
     g.setFont(11.0f);
-    g.drawText("Selected region name is editable. Gain changes are non-destructive until export.",
-               44, 598, getWidth() - 88, 18, juce::Justification::centredLeft);
+    g.drawText("SELECTED WORD / REGION", 44, 548, 180, 18, juce::Justification::centredLeft);
+    g.drawText("GAIN", getWidth() - 278, 548, 150, 18, juce::Justification::centred);
+    g.drawText("Changes affect playback and WAV export.", 44, 648, getWidth() - 88, 14,
+               juce::Justification::centredLeft);
 }
 
 void VocalDynamicsStandaloneEditor::resized()
@@ -893,11 +901,11 @@ void VocalDynamicsStandaloneEditor::resized()
     zoomInButton.setBounds(width - 105, 32, 38, 42);
     exportButton.setBounds(width - 530, 112, 125, 30);
 
-    selectedWordLabel.setBounds(44, 548, 180, 28);
-    wordGainSlider.setBounds(width - 270, 510, 150, 105);
-    gainValueLabel.setBounds(width - 155, 548, 95, 28);
-    addWordButton.setBounds(44, 584, 150, 30);
-    whisperExeButton.setBounds(210, 584, 130, 30);
-    whisperModelButton.setBounds(346, 584, 100, 30);
-    transcribeButton.setBounds(452, 584, 160, 30);
+    selectedWordLabel.setBounds(44, 568, 190, 30);
+    wordGainSlider.setBounds(width - 290, 562, 145, 88);
+    gainValueLabel.setBounds(width - 145, 568, 90, 28);
+    addWordButton.setBounds(44, 606, 145, 30);
+    whisperExeButton.setBounds(198, 606, 130, 30);
+    whisperModelButton.setBounds(337, 606, 100, 30);
+    transcribeButton.setBounds(446, 606, 160, 30);
 }
