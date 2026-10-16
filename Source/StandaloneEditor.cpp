@@ -826,7 +826,7 @@ void VocalDynamicsStandaloneEditor::analyzeTempoAndKey()
     const int sourceCount = static_cast<int>(juce::jmin<juce::int64>(reader->lengthInSamples, maxSamples));
     juce::AudioBuffer<float> source(1, sourceCount);
     float* channels[] = { source.getWritePointer(0) };
-    if (!reader->read(channels, 1, 0, 0, sourceCount, true, false))
+    if (!reader->read(channels, 1, 0, sourceCount, true, true))
     {
         status.setText("Could not read audio samples for analysis.", juce::dontSendNotification);
         return;
