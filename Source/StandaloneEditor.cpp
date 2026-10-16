@@ -1315,7 +1315,7 @@ void VocalDynamicsStandaloneEditor::toggleRecording()
         {
             const juce::ScopedLock lock(recordingLock);
             recordingWriter = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
-                std::unique_ptr<juce::AudioFormatWriter>(writer), recordingThread, 32768);
+                writer, recordingThread, 32768);
             recordingActive = true;
         }
         recordButton.setButtonText("■ STOP REC");
