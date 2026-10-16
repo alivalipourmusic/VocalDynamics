@@ -57,6 +57,8 @@ private:
     };
 
     void chooseFile();
+    void openAudioSettings();
+    void refreshAudioStatus();
     void chooseWhisperExecutable();
     void chooseWhisperModel();
     void startTranscription();
@@ -102,6 +104,7 @@ private:
 
     juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel, zoomLabel;
     juce::TextButton importButton { "IMPORT VOCAL" };
+    juce::TextButton settingsButton { "AUDIO SETTINGS" };
     juce::TextButton playButton { "PLAY / SPACE" };
     juce::TextButton stopButton { "STOP" };
     juce::TextButton exportButton { "EXPORT WAV" };
