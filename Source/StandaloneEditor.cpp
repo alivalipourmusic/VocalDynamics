@@ -122,7 +122,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     const auto cyan = juce::Colour(0xff54f2c2);
     const auto muted = juce::Colour(0xff91a3bd);
 
-    title.setText("VOCAL DYNAMICS", juce::dontSendNotification);
+    title.setText("VOCAL EDITOR", juce::dontSendNotification);
     title.setFont(juce::Font(27.0f, juce::Font::bold));
     title.setColour(juce::Label::textColourId, white);
     addAndMakeVisible(title);
@@ -331,7 +331,7 @@ void VocalDynamicsStandaloneEditor::openAudioSettings()
 
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(selector);
-    options.dialogTitle = "Vocal Dynamics - Audio Settings";
+    options.dialogTitle = "Vocal Editor - Audio Settings";
     options.dialogBackgroundColour = juce::Colour(0xff111f2d);
     options.escapeKeyTriggersCloseButton = true;
     options.useNativeTitleBar = true;
