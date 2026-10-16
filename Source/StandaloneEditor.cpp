@@ -137,7 +137,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     gainValueLabel.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(gainValueLabel);
 
-    zoomLabel.setText("100%", juce::dontSendNotification);
+    zoomLabel.setText("ZOOM", juce::dontSendNotification);
     zoomLabel.setColour(juce::Label::textColourId, muted);
     zoomLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(zoomLabel);
@@ -166,8 +166,10 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
     addWordButton.onClick = [this] { createWordEventFromSelection(); };
-    zoomInButton.onClick = [this] { zoomBy(0.5); };
-    zoomOutButton.onClick = [this] { zoomBy(2.0); };
+    zoomInButton.setTooltip("Zoom in");
+    zoomOutButton.setTooltip("Zoom out");
+    zoomInButton.onClick = [this] { zoomBy(0.8); };
+    zoomOutButton.onClick = [this] { zoomBy(1.25); };
     whisperExeButton.onClick = [this] { chooseWhisperExecutable(); };
     whisperModelButton.onClick = [this] { chooseWhisperModel(); };
     transcribeButton.onClick = [this] { startTranscription(); };
@@ -557,7 +559,10 @@ void VocalDynamicsStandaloneEditor::zoomBy(double factor)
     if (total <= 0.0 || factor <= 0.0)
         return;
     const double oldSpan = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
-    const double newSpan = juce::jlimit(0.5, total, oldSpan * factor);
+    // Keep zoom steps controlled and prevent extreme magnifications.
+    // Fit-to-window is 100% (the full file); maximum magnification is 100x.
+    const double minimumSpan = juce::jmax(0.05, total / 100.0);
+    const double newSpan = juce::jlimit(minimumSpan, total, oldSpan * factor);
     const double anchor = juce::jlimit(0.0, total, transport.getCurrentPosition());
     const double anchorRatio = (anchor - viewStartSeconds) / juce::jmax(0.001, oldSpan);
     double newStart = anchor - anchorRatio * newSpan;
@@ -570,10 +575,9 @@ void VocalDynamicsStandaloneEditor::zoomBy(double factor)
 
 void VocalDynamicsStandaloneEditor::updateZoomLabel()
 {
-    const double total = thumbnail.getTotalLength();
-    const double span = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
-    const double zoom = span > 0.0 ? total / span * 100.0 : 100.0;
-    zoomLabel.setText(juce::String(static_cast<int>(zoom)) + "%", juce::dontSendNotification);
+    // The toolbar label is intentionally language-neutral and stays concise.
+    // Zoom percentage is omitted: the user asked for a simple ZOOM label and +/- buttons.
+    zoomLabel.setText("ZOOM", juce::dontSendNotification);
 }
 
 bool VocalDynamicsStandaloneEditor::keyPressed(const juce::KeyPress& key)
@@ -866,8 +870,9 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             const double visibleStart = viewStartSeconds;
             const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
             const auto drawable = waveArea.reduced(12, 14);
-            const auto x = drawable.getX() + static_cast<int>(
+            const auto rawX = drawable.getX() + static_cast<int>(
                 ((transport.getCurrentPosition() - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * drawable.getWidth());
+            const auto x = juce::jlimit(drawable.getX(), drawable.getRight(), rawX);
             g.setColour(white);
             g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 8), static_cast<float>(waveArea.getBottom() - 8));
         }
