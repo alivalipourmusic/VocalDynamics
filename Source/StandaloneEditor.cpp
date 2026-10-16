@@ -1,5 +1,21 @@
 #include "StandaloneEditor.h"
 
+namespace
+{
+juce::String formatTimelineTime(double seconds)
+{
+    seconds = juce::jmax(0.0, seconds);
+    const auto totalMilliseconds = static_cast<juce::int64>(std::llround(seconds * 1000.0));
+    const auto minutes = totalMilliseconds / 60000;
+    const auto secs = (totalMilliseconds / 1000) % 60;
+    const auto millis = totalMilliseconds % 1000;
+    return juce::String::formatted("%02lld:%02lld.%03lld",
+        static_cast<long long>(minutes),
+        static_cast<long long>(secs),
+        static_cast<long long>(millis));
+}
+}
+
 VocalDynamicsStandaloneEditor::TranscriptionWorker::TranscriptionWorker(
     juce::File executable, juce::File model, juce::File audio, juce::File outputSrt,
     std::function<void(bool, juce::String)> completion)
@@ -113,7 +129,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     status.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(status);
 
-    timeLabel.setText("0.000 s / 0.000 s", juce::dontSendNotification);
+    timeLabel.setText("00:00.000  /  00:00.000", juce::dontSendNotification);
+    timeLabel.setFont(juce::Font(16.0f, juce::Font::bold));
     timeLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(timeLabel);
 
@@ -580,8 +597,8 @@ void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
         return;
     const double target = timeAtX(x);
     transport.setPosition(target);
-    timeLabel.setText(juce::String(target, 3) + " s / "
-                      + juce::String(transport.getLengthInSeconds(), 3) + " s",
+    timeLabel.setText(formatTimelineTime(target) + "  /  "
+                      + formatTimelineTime(transport.getLengthInSeconds()),
                       juce::dontSendNotification);
     repaint();
     if (!transport.isPlaying())
@@ -870,7 +887,7 @@ void VocalDynamicsStandaloneEditor::timerCallback()
 {
     const auto position = transport.getCurrentPosition();
     const auto length = transport.getLengthInSeconds();
-    timeLabel.setText(juce::String(position, 3) + " s / " + juce::String(length, 3) + " s",
+    timeLabel.setText(formatTimelineTime(position) + "  /  " + formatTimelineTime(length),
                       juce::dontSendNotification);
     repaint();
 }
@@ -908,10 +925,27 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
 
     if (thumbnail.getTotalLength() > 0.0)
     {
-        g.setColour(cyan);
         const double visibleStart = viewStartSeconds;
         const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : thumbnail.getTotalLength();
-        thumbnail.drawChannels(g, waveArea.reduced(12, 14), visibleStart, visibleEnd, 1.0f);
+        const auto drawable = waveArea.reduced(12, 14);
+
+        // Timeline ruler: labels and tick marks use the same visible time range
+        // and drawable geometry as the waveform and playhead.
+        g.setColour(muted);
+        g.setFont(10.0f);
+        const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
+        const double roughStep = visibleSpan / juce::jmax(2, drawable.getWidth() / 100);
+        const double step = roughStep <= 1.0 ? 1.0 : (roughStep <= 2.0 ? 2.0 : (roughStep <= 5.0 ? 5.0 : std::ceil(roughStep / 5.0) * 5.0));
+        double tick = std::ceil(visibleStart / step) * step;
+        for (; tick <= visibleEnd; tick += step)
+        {
+            const int x = drawable.getX() + static_cast<int>((tick - visibleStart) / visibleSpan * drawable.getWidth());
+            g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 2), static_cast<float>(waveArea.getY() + 10));
+            g.drawText(formatTimelineTime(tick), x - 34, waveArea.getY() + 1, 68, 12, juce::Justification::centred);
+        }
+
+        g.setColour(cyan);
+        thumbnail.drawChannels(g, drawable, visibleStart, visibleEnd, 1.0f);
 
         if (isSelectingRange)
         {
