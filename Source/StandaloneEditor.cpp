@@ -207,7 +207,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     deviceManager.addAudioCallback(&audioSourcePlayer);
     refreshAudioStatus();
     startTimerHz(20);
-    setSize(1100, 720);
+    setSize(1240, 760);
 }
 
 VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
@@ -570,7 +570,7 @@ void VocalDynamicsStandaloneEditor::stopPlayback()
 
 juce::Rectangle<int> VocalDynamicsStandaloneEditor::waveformBounds() const
 {
-    return { 30, 155, getWidth() - 60, 280 };
+    return { 28, 145, juce::jmax(520, getWidth() - 380), 285 };
 }
 
 double VocalDynamicsStandaloneEditor::timeAtX(int x) const
@@ -636,7 +636,7 @@ void VocalDynamicsStandaloneEditor::updateZoomLabel()
     // 100 = maximum supported magnification. It never shows 200–800% values.
     const double fraction = total > 0.0 ? 1.0 - span / total : 0.0;
     const int percent = juce::jlimit(0, 100, static_cast<int>(std::round(fraction * 100.0)));
-    zoomLabel.setText("ZOOM " + juce::String(percent) + "%", juce::dontSendNotification);
+    zoomLabel.setText(juce::String(percent) + "%", juce::dontSendNotification);
 }
 
 bool VocalDynamicsStandaloneEditor::keyPressed(const juce::KeyPress& key)
@@ -682,7 +682,7 @@ void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
         return;
     }
 
-    if (event.y >= 450 && event.y <= 534)
+    if (event.y >= 446 && event.y <= 558 && event.x >= waveformBounds().getX() && event.x <= waveformBounds().getRight())
         selectEventAt(event.getPosition());
 }
 
@@ -900,174 +900,239 @@ void VocalDynamicsStandaloneEditor::changeListenerCallback(juce::ChangeBroadcast
 
 void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
 {
-    const auto background = juce::Colour(0xff080e17);
-    const auto panel = juce::Colour(0xff111f2d);
-    const auto border = juce::Colour(0xff294153);
-    const auto cyan = juce::Colour(0xff39d9e9);
-    const auto purple = juce::Colour(0xff9b83ff);
-    const auto white = juce::Colour(0xffedf7ff);
-    const auto muted = juce::Colour(0xff7893a7);
+    const auto bg = juce::Colour(0xff080b10);
+    const auto surface = juce::Colour(0xff101720);
+    const auto raised = juce::Colour(0xff151f2b);
+    const auto edge = juce::Colour(0xff293747);
+    const auto cyan = juce::Colour(0xff51e0d0);
+    const auto violet = juce::Colour(0xffa68bff);
+    const auto text = juce::Colour(0xffedf4fb);
+    const auto muted = juce::Colour(0xff8193a7);
+    const auto main = waveformBounds();
 
-    g.fillAll(background);
-    auto bounds = getLocalBounds().toFloat().reduced(14.0f);
-    g.setColour(panel);
-    g.fillRoundedRectangle(bounds, 16.0f);
-    g.setColour(border);
-    g.drawRoundedRectangle(bounds, 16.0f, 1.0f);
+    g.fillAll(bg);
+    // A purpose-built editorial layout: narrow utility rail, large waveform canvas,
+    // event strip and a contextual inspector. Avoid the generic rounded-card look.
+    g.setColour(juce::Colour(0xff0d131b));
+    g.fillRect(0, 0, getWidth(), 112);
     g.setColour(cyan);
-    g.fillRoundedRectangle(30.0f, 101.0f, static_cast<float>(getWidth() - 60), 2.0f, 1.0f);
+    g.fillRect(0, 0, 4, 112);
+    g.setColour(text);
+    g.setFont(juce::Font(21.0f, juce::Font::bold));
+    g.drawText("VOCAL", 28, 17, 92, 26, juce::Justification::centredLeft);
+    g.setColour(cyan);
+    g.drawText("DYNAMICS", 28, 41, 118, 23, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(10.5f);
+    g.drawText("EVENT-BASED VOCAL WORKSTATION", 28, 72, 240, 16, juce::Justification::centredLeft);
 
-    const auto waveArea = waveformBounds();
-    g.setColour(juce::Colour(0xff091521));
-    g.fillRoundedRectangle(waveArea.toFloat(), 12.0f);
-    g.setColour(isDraggingFile || isSelectingRange ? cyan : border);
-    g.drawRoundedRectangle(waveArea.toFloat(), 12.0f, isSelectingRange ? 2.5f : 1.0f);
+    g.setColour(edge);
+    g.drawHorizontalLine(111, 0.0f, static_cast<float>(getWidth()));
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("TRANSPORT", 285, 17, 90, 14, juce::Justification::centredLeft);
+    g.setColour(text);
+    g.setFont(juce::Font(18.0f, juce::Font::bold));
+    g.drawText(timeLabel.getText(), 285, 34, 220, 27, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("SPACE  PLAY/PAUSE     +/-  ZOOM     ESC  STOP", 285, 68, 300, 16, juce::Justification::centredLeft);
 
+    // Main waveform / timeline canvas.
+    g.setColour(surface);
+    g.fillRoundedRectangle(main.toFloat(), 5.0f);
+    g.setColour(isDraggingFile ? cyan : edge);
+    g.drawRoundedRectangle(main.toFloat(), 5.0f, isDraggingFile ? 2.0f : 1.0f);
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("WAVEFORM  /  CLICK TO SEEK  /  DRAG TO SCRUB", main.getX() + 14, main.getY() + 8,
+               main.getWidth() - 28, 14, juce::Justification::centredLeft);
+
+    const auto drawable = main.reduced(12, 28);
     if (thumbnail.getTotalLength() > 0.0)
     {
+        const double duration = transport.getLengthInSeconds();
         const double visibleStart = viewStartSeconds;
-        const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : thumbnail.getTotalLength();
-        const auto drawable = waveArea.reduced(12, 14);
+        const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
+        const double span = juce::jmax(0.001, visibleEnd - visibleStart);
 
-        // Timeline ruler: labels and tick marks use the same visible time range
-        // and drawable geometry as the waveform and playhead.
-        g.setColour(muted);
-        g.setFont(10.0f);
-        const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
-        const double roughStep = visibleSpan / juce::jmax(2, drawable.getWidth() / 100);
-        const double step = roughStep <= 1.0 ? 1.0 : (roughStep <= 2.0 ? 2.0 : (roughStep <= 5.0 ? 5.0 : std::ceil(roughStep / 5.0) * 5.0));
-        double tick = std::ceil(visibleStart / step) * step;
-        for (; tick <= visibleEnd; tick += step)
+        // Quiet grid lines make timing readable without competing with the signal.
+        for (int i = 0; i <= 8; ++i)
         {
-            const int x = drawable.getX() + static_cast<int>((tick - visibleStart) / visibleSpan * drawable.getWidth());
-            g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 2), static_cast<float>(waveArea.getY() + 10));
-            g.drawText(formatTimelineTime(tick), x - 34, waveArea.getY() + 1, 68, 12, juce::Justification::centred);
+            const int x = drawable.getX() + i * drawable.getWidth() / 8;
+            g.setColour(juce::Colour(0xff1d2a37));
+            g.drawVerticalLine(x, static_cast<float>(drawable.getY()), static_cast<float>(drawable.getBottom()));
+            const double t = visibleStart + span * static_cast<double>(i) / 8.0;
+            g.setColour(muted);
+            g.setFont(9.5f);
+            g.drawText(formatTimelineTime(t), x - 36, main.getY() + 24, 72, 13, juce::Justification::centred);
         }
 
-        g.setColour(cyan);
+        g.setColour(cyan.withAlpha(0.90f));
         thumbnail.drawChannels(g, drawable, visibleStart, visibleEnd, 1.0f);
+
+        // A center reference line improves visual reading of low-level consonants.
+        g.setColour(juce::Colour(0x334bded0));
+        g.drawHorizontalLine(drawable.getCentreY(), static_cast<float>(drawable.getX()), static_cast<float>(drawable.getRight()));
 
         if (isSelectingRange)
         {
             const int x = juce::jmin(selectionStartX, selectionCurrentX);
             const int w = std::abs(selectionCurrentX - selectionStartX);
-            g.setColour(juce::Colour(0x5539d9e9));
-            g.fillRect(x, waveArea.getY() + 1, w, waveArea.getHeight() - 2);
+            g.setColour(juce::Colour(0x3351e0d0));
+            g.fillRect(x, drawable.getY(), w, drawable.getHeight());
+            g.setColour(cyan);
+            g.drawRect(x, drawable.getY(), w, drawable.getHeight(), 1.0f);
         }
 
-        const auto duration = transport.getLengthInSeconds();
         if (duration > 0.0)
         {
-            const double visibleStart = viewStartSeconds;
-            const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
-            const auto drawable = waveArea.reduced(12, 14);
-            const double cursorTime = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
-            const auto rawX = drawable.getX() + static_cast<int>(
-                ((cursorTime - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * drawable.getWidth());
-            const auto x = juce::jlimit(drawable.getX(), drawable.getRight(), rawX);
-            g.setColour(white);
-            g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 8), static_cast<float>(waveArea.getBottom() - 8));
+            const double cursor = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
+            const int x = drawable.getX() + static_cast<int>((cursor - visibleStart) / span * drawable.getWidth());
+            g.setColour(juce::Colour(0xfff6fcff));
+            g.drawVerticalLine(x, static_cast<float>(drawable.getY() - 2), static_cast<float>(drawable.getBottom()));
+            g.setColour(cyan);
+            g.fillEllipse(static_cast<float>(x - 3), static_cast<float>(drawable.getY() - 4), 6.0f, 6.0f);
         }
     }
     else
     {
+        g.setColour(juce::Colour(0x1451e0d0));
+        g.fillRect(drawable);
+        g.setColour(cyan);
+        g.setFont(juce::Font(15.0f, juce::Font::bold));
+        g.drawText("DROP A VOCAL FILE", drawable, juce::Justification::centred);
         g.setColour(muted);
-        g.setFont(15.0f);
-        g.drawText("DRAG & DROP AN AUDIO FILE HERE  •  OR CLICK IMPORT VOCAL",
-                   waveArea.reduced(20, 20), juce::Justification::centred);
+        g.setFont(11.0f);
+        g.drawText("WAV  /  AIFF  /  FLAC  /  MP3  /  OGG", drawable.getX(), drawable.getCentreY() + 24,
+                   drawable.getWidth(), 20, juce::Justification::centred);
     }
-
     if (isDraggingFile)
     {
-        g.setColour(juce::Colour(0x9939d9e9));
-        g.fillRoundedRectangle(waveArea.toFloat().reduced(4.0f), 12.0f);
-        g.setColour(juce::Colour(0xff39d9e9));
-        g.drawRoundedRectangle(waveArea.toFloat().reduced(4.0f), 12.0f, 3.0f);
-        g.setColour(juce::Colour(0xffedf7ff));
-        g.setFont(juce::Font(juce::FontOptions(20.0f, juce::Font::bold)));
-        g.drawText("DROP AUDIO TO IMPORT",
-                   waveArea.reduced(20, 20), juce::Justification::centred);
+        g.setColour(juce::Colour(0x2251e0d0));
+        g.fillRect(main.reduced(4));
+        g.setColour(cyan);
+        g.drawRect(main.reduced(4), 2.0f);
     }
 
-    juce::Rectangle<float> eventArea(30.0f, 450.0f, static_cast<float>(getWidth() - 60), 84.0f);
-    g.setColour(juce::Colour(0xff0c1824));
-    g.fillRoundedRectangle(eventArea, 10.0f);
-    g.setColour(border);
-    g.drawRoundedRectangle(eventArea, 10.0f, 1.0f);
-    g.setColour(purple);
-    g.setFont(14.0f);
-    g.drawText("DETECTED WORDS  /  SELECT A WORD TO EDIT ITS GAIN",
-               eventArea.getX() + 16.0f, eventArea.getY() + 8.0f, eventArea.getWidth() - 32.0f, 24.0f,
-               juce::Justification::centredLeft);
+    // Event lane: only display real transcription segments. No fake detector events.
+    juce::Rectangle<int> lane(main.getX(), 446, main.getWidth(), 112);
+    g.setColour(surface);
+    g.fillRoundedRectangle(lane.toFloat(), 5.0f);
+    g.setColour(edge);
+    g.drawRoundedRectangle(lane.toFloat(), 5.0f, 1.0f);
+    g.setColour(violet);
+    g.fillRect(lane.getX(), lane.getY(), 3, lane.getHeight());
+    g.setColour(text);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.drawText("WORD EVENTS", lane.getX() + 14, lane.getY() + 8, 140, 18, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText(juce::String(static_cast<int>(wordEvents.size())) + " SEGMENTS",
+               lane.getRight() - 110, lane.getY() + 9, 94, 16, juce::Justification::centredRight);
 
     if (wordEvents.empty() || thumbnail.getTotalLength() <= 0.0)
     {
         g.setColour(muted);
-        g.setFont(12.0f);
-        g.drawText("No words detected yet. Set whisper-cli.exe and a multilingual model, then click TRANSCRIBE WORDS.",
-                   eventArea.reduced(16.0f).withTrimmedTop(38.0f), juce::Justification::centredLeft);
+        g.setFont(11.0f);
+        g.drawText("No word events yet. Load audio, configure Whisper and run word detection.",
+                   lane.getX() + 14, lane.getY() + 42, lane.getWidth() - 28, 28, juce::Justification::centredLeft);
     }
     else
     {
         const double duration = thumbnail.getTotalLength();
         const double visibleStart = viewStartSeconds;
         const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
-        const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
-        const int laneX = waveformBounds().getX() + 12;
-        const int laneWidth = waveformBounds().getWidth() - 24;
+        const double span = juce::jmax(0.001, visibleEnd - visibleStart);
+        const int laneX = main.getX() + 12;
+        const int laneWidth = main.getWidth() - 24;
         for (int i = 0; i < static_cast<int>(wordEvents.size()); ++i)
         {
             const auto& e = wordEvents[static_cast<size_t>(i)];
-            const int x1 = laneX + static_cast<int>((e.startSeconds - visibleStart) / visibleSpan * laneWidth);
-            const int x2 = laneX + static_cast<int>((e.endSeconds - visibleStart) / visibleSpan * laneWidth);
-            juce::Rectangle<float> block(static_cast<float>(x1), 488.0f,
-                                         static_cast<float>(juce::jmax(8, x2 - x1)), 30.0f);
-            g.setColour(i == selectedEvent ? juce::Colour(0xff246e7b) : juce::Colour(0xff263b54));
-            g.fillRoundedRectangle(block, 5.0f);
-            g.setColour(i == selectedEvent ? cyan : border);
-            g.drawRoundedRectangle(block, 5.0f, 1.0f);
-            g.setColour(white);
-            g.setFont(11.0f);
-            g.drawText(e.word + "  " + juce::String(e.gainDb, 1) + " dB",
-                       block.reduced(4.0f), juce::Justification::centred);
+            if (e.endSeconds < visibleStart || e.startSeconds > visibleEnd) continue;
+            const int x1 = laneX + static_cast<int>((e.startSeconds - visibleStart) / span * laneWidth);
+            const int x2 = laneX + static_cast<int>((e.endSeconds - visibleStart) / span * laneWidth);
+            juce::Rectangle<float> block(static_cast<float>(x1), 482.0f,
+                static_cast<float>(juce::jmax(10, x2 - x1)), 31.0f);
+            g.setColour(i == selectedEvent ? juce::Colour(0xff1f625f) : juce::Colour(0xff263342));
+            g.fillRoundedRectangle(block, 3.0f);
+            g.setColour(i == selectedEvent ? cyan : edge);
+            g.drawRoundedRectangle(block, 3.0f, i == selectedEvent ? 1.5f : 1.0f);
+            g.setColour(text);
+            g.setFont(10.0f);
+            g.drawText(e.word + "  " + juce::String(e.gainDb, 1) + " dB", block.reduced(3.0f),
+                       juce::Justification::centred);
         }
     }
 
-    // Dedicated edit strip keeps the gain control clear of the event lane.
-    juce::Rectangle<float> editArea(30.0f, 545.0f, static_cast<float>(getWidth() - 60), 122.0f);
-    g.setColour(juce::Colour(0xff132332));
-    g.fillRoundedRectangle(editArea, 10.0f);
-    g.setColour(border);
-    g.drawRoundedRectangle(editArea, 10.0f, 1.0f);
+    // Right-side inspector follows the selected event; controls remain functional.
+    const int sideX = main.getRight() + 14;
+    const int sideW = juce::jmax(220, getWidth() - sideX - 28);
+    juce::Rectangle<int> inspector(sideX, 145, sideW, 500);
+    g.setColour(surface);
+    g.fillRoundedRectangle(inspector.toFloat(), 5.0f);
+    g.setColour(edge);
+    g.drawRoundedRectangle(inspector.toFloat(), 5.0f, 1.0f);
+    g.setColour(cyan);
+    g.fillRect(inspector.getX(), inspector.getY(), 3, 42);
     g.setColour(muted);
-    g.setFont(11.0f);
-    g.drawText("SELECTED WORD / REGION", 44, 548, 180, 18, juce::Justification::centredLeft);
-    g.drawText("GAIN", getWidth() - 278, 548, 150, 18, juce::Justification::centred);
-    g.drawText("Changes affect playback and WAV export.", 44, 648, getWidth() - 88, 14,
-               juce::Justification::centredLeft);
+    g.setFont(10.0f);
+    g.drawText("INSPECTOR  /  ACTIVE REGION", inspector.getX() + 15, inspector.getY() + 13,
+               inspector.getWidth() - 28, 16, juce::Justification::centredLeft);
+    g.setColour(edge);
+    g.drawHorizontalLine(inspector.getY() + 44, static_cast<float>(inspector.getX() + 14),
+                         static_cast<float>(inspector.getRight() - 14));
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("EVENT GAIN", inspector.getX() + 16, inspector.getY() + 205,
+               inspector.getWidth() - 32, 16, juce::Justification::centredLeft);
+    g.setColour(cyan);
+    g.setFont(juce::Font(22.0f, juce::Font::bold));
+    g.drawText(gainValueLabel.getText(), inspector.getX() + 16, inspector.getY() + 222,
+               inspector.getWidth() - 32, 28, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("Affects playback + WAV export", inspector.getX() + 16, inspector.getBottom() - 28,
+               inspector.getWidth() - 32, 15, juce::Justification::centredLeft);
+
+    // Bottom status strip, deliberately quiet.
+    g.setColour(juce::Colour(0xff0d131b));
+    g.fillRect(0, getHeight() - 34, getWidth(), 34);
+    g.setColour(edge);
+    g.drawHorizontalLine(getHeight() - 34, 0.0f, static_cast<float>(getWidth()));
+    g.setColour(cyan);
+    g.fillEllipse(18.0f, static_cast<float>(getHeight() - 21), 6.0f, 6.0f);
+    g.setColour(muted);
+    g.setFont(10.5f);
+    g.drawText(status.getText(), 32, getHeight() - 28, getWidth() - 48, 20, juce::Justification::centredLeft);
 }
 
 void VocalDynamicsStandaloneEditor::resized()
 {
     const int width = getWidth();
-    title.setBounds(30, 22, 400, 38);
-    status.setBounds(32, 62, 600, 25);
-    timeLabel.setBounds(32, 112, 220, 24);
+    const int height = getHeight();
+    const int sideX = juce::jmax(600, width - 330);
+    title.setBounds(28, 14, 170, 58);
+    status.setBounds(32, height - 32, width - 48, 24);
+    timeLabel.setBounds(285, 34, 230, 27);
 
-    importButton.setBounds(width - 650, 32, 125, 42);
-    playButton.setBounds(width - 515, 32, 105, 42);
-    stopButton.setBounds(width - 400, 32, 65, 42);
-    zoomOutButton.setBounds(width - 325, 32, 38, 42);
-    zoomLabel.setBounds(width - 285, 32, 55, 42);
-    zoomInButton.setBounds(width - 225, 32, 38, 42);
-    settingsButton.setBounds(width - 180, 32, 150, 42);
-    exportButton.setBounds(width - 650, 112, 125, 30);
+    importButton.setBounds(width - 420, 34, 118, 38);
+    playButton.setBounds(width - 294, 34, 86, 38);
+    stopButton.setBounds(width - 200, 34, 62, 38);
+    zoomOutButton.setBounds(width - 128, 34, 30, 38);
+    zoomLabel.setBounds(width - 95, 34, 54, 38);
+    zoomInButton.setBounds(width - 38, 34, 30, 38);
 
-    selectedWordLabel.setBounds(44, 568, 190, 30);
-    wordGainSlider.setBounds(width - 290, 562, 145, 88);
-    gainValueLabel.setBounds(width - 145, 568, 90, 28);
-    addWordButton.setBounds(44, 606, 145, 30);
-    whisperExeButton.setBounds(198, 606, 130, 30);
-    whisperModelButton.setBounds(337, 606, 100, 30);
-    transcribeButton.setBounds(446, 606, 160, 30);
+    // Inspector is a compact vertical tool rack rather than a row of crowded buttons.
+    const int inspectorX = sideX + 16;
+    const int inspectorW = juce::jmax(180, width - inspectorX - 28);
+    selectedWordLabel.setBounds(inspectorX, 205, inspectorW, 34);
+    wordGainSlider.setBounds(inspectorX + 4, 365, inspectorW - 8, 104);
+    gainValueLabel.setBounds(inspectorX, 330, inspectorW, 28);
+    settingsButton.setBounds(inspectorX, 160, inspectorW, 30);
+    exportButton.setBounds(inspectorX, 248, inspectorW, 30);
+    whisperExeButton.setBounds(inspectorX, 286, inspectorW, 28);
+    whisperModelButton.setBounds(inspectorX, 318, inspectorW, 28);
+    transcribeButton.setBounds(inspectorX, 486, inspectorW, 34);
+    addWordButton.setBounds(inspectorX, 526, inspectorW, 26);
 }
