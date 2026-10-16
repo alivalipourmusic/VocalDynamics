@@ -4,6 +4,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 {
     formatManager.registerBasicFormats();
     thumbnail.addChangeListener(this);
+    readAheadThread.startThread();
 
     const auto white = juce::Colour(0xffedf7ff);
     const auto cyan = juce::Colour(0xff39d9e9);
@@ -14,12 +15,12 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     title.setColour(juce::Label::textColourId, white);
     addAndMakeVisible(title);
 
-    status.setText("STANDALONE VOCAL EDITOR  /  STAGE 1", juce::dontSendNotification);
+    status.setText("DROP A VOCAL FILE HERE  /  OR CLICK IMPORT VOCAL", juce::dontSendNotification);
     status.setFont(juce::Font(12.0f));
     status.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(status);
 
-    timeLabel.setText("00:00.000 / 00:00.000", juce::dontSendNotification);
+    timeLabel.setText("0.000 s / 0.000 s", juce::dontSendNotification);
     timeLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(timeLabel);
 
@@ -36,7 +37,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
     const auto setupResult = deviceManager.initialiseWithDefaultDevices(0, 2);
     if (setupResult.isNotEmpty())
-        status.setText("Audio device: " + setupResult, juce::dontSendNotification);
+        status.setText("Audio device error: " + setupResult, juce::dontSendNotification);
 
     audioSourcePlayer.setSource(&transport);
     deviceManager.addAudioCallback(&audioSourcePlayer);
@@ -48,11 +49,34 @@ VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
 {
     stopTimer();
     thumbnail.removeChangeListener(this);
+
+    // Disconnect the device callback before destroying any audio source it can read.
     deviceManager.removeAudioCallback(&audioSourcePlayer);
     audioSourcePlayer.setSource(nullptr);
+
     transport.stop();
     transport.setSource(nullptr);
     readerSource.reset();
+    readAheadThread.stopThread(2000);
+}
+
+bool VocalDynamicsStandaloneEditor::isInterestedInFileDrag(const juce::StringArray& files)
+{
+    for (const auto& path : files)
+    {
+        const juce::File file(path);
+        if (file.existsAsFile() && formatManager.findFormatForFileExtension(file.getFileExtension()) != nullptr)
+            return true;
+    }
+    return false;
+}
+
+void VocalDynamicsStandaloneEditor::filesDropped(const juce::StringArray& files, int, int)
+{
+    isDraggingFile = false;
+    if (!files.isEmpty())
+        loadFile(juce::File(files[0]));
+    repaint();
 }
 
 void VocalDynamicsStandaloneEditor::chooseFile()
@@ -67,7 +91,11 @@ void VocalDynamicsStandaloneEditor::chooseFile()
         (const juce::FileChooser& chooser)
         {
             if (safeThis != nullptr)
-                safeThis->loadFile(chooser.getResult());
+            {
+                const auto selected = chooser.getResult();
+                if (selected != juce::File{})
+                    safeThis->loadFile(selected);
+            }
         });
 }
 
@@ -76,28 +104,44 @@ void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
     if (!file.existsAsFile())
         return;
 
+    status.setText("Opening audio file...", juce::dontSendNotification);
+
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
     if (reader == nullptr)
     {
-        status.setText("Could not open this audio format.", juce::dontSendNotification);
+        status.setText("Unsupported or unreadable audio file: " + file.getFileName(),
+                       juce::dontSendNotification);
         return;
     }
 
+    if (!juce::isPositiveAndBelow(reader->numChannels, 65) || reader->sampleRate <= 0.0
+        || reader->lengthInSamples <= 0)
+    {
+        status.setText("The audio file has invalid channel, sample-rate, or length information.",
+                       juce::dontSendNotification);
+        return;
+    }
+
+    const double sampleRate = reader->sampleRate;
+
+    // Release the old source only after the transport has disconnected from it.
     transport.stop();
     transport.setSource(nullptr);
     readerSource.reset();
 
-    const double sampleRate = reader->sampleRate;
-    readerSource = std::make_unique<juce::AudioFormatReaderSource>(reader.release(), true);
-    transport.setSource(readerSource.get(), 32768, nullptr, sampleRate);
-    currentFile = file;
+    auto newSource = std::make_unique<juce::AudioFormatReaderSource>(reader.release(), true);
+    transport.setSource(newSource.get(), 32768, &readAheadThread, sampleRate, 2);
+    readerSource = std::move(newSource);
 
-    if (!thumbnail.setSource(new juce::FileInputSource(file)))
-        status.setText("Audio opened, but waveform could not be generated.", juce::dontSendNotification);
-    else
-        status.setText("Audio loaded. Playback is ready.", juce::dontSendNotification);
+    currentFile = file;
+    thumbnail.clear();
+    const bool waveformStarted = thumbnail.setSource(new juce::FileInputSource(file));
 
     playButton.setButtonText("PLAY");
+    status.setText(waveformStarted
+        ? "Loaded: " + file.getFileName()
+        : "Audio loaded; waveform preview could not be opened.",
+        juce::dontSendNotification);
     repaint();
 }
 
@@ -105,7 +149,7 @@ void VocalDynamicsStandaloneEditor::togglePlayback()
 {
     if (readerSource == nullptr)
     {
-        status.setText("Import a vocal file first.", juce::dontSendNotification);
+        status.setText("Import or drop a vocal file first.", juce::dontSendNotification);
         return;
     }
 
@@ -134,9 +178,9 @@ void VocalDynamicsStandaloneEditor::timerCallback()
 {
     const auto position = transport.getCurrentPosition();
     const auto length = transport.getLengthInSeconds();
-    timeLabel.setText(
-        juce::String(position, 3) + " s / " + juce::String(length, 3) + " s",
-        juce::dontSendNotification);
+    timeLabel.setText(juce::String(position, 3) + " s / " + juce::String(length, 3) + " s",
+                      juce::dontSendNotification);
+    repaint();
 }
 
 void VocalDynamicsStandaloneEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -167,8 +211,8 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     juce::Rectangle<int> waveArea(30, 155, getWidth() - 60, 300);
     g.setColour(juce::Colour(0xff091521));
     g.fillRoundedRectangle(waveArea.toFloat(), 12.0f);
-    g.setColour(border);
-    g.drawRoundedRectangle(waveArea.toFloat(), 12.0f, 1.0f);
+    g.setColour(isDraggingFile ? cyan : border);
+    g.drawRoundedRectangle(waveArea.toFloat(), 12.0f, isDraggingFile ? 2.5f : 1.0f);
 
     if (thumbnail.getTotalLength() > 0.0)
     {
@@ -190,7 +234,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     {
         g.setColour(muted);
         g.setFont(15.0f);
-        g.drawText("IMPORT A VOCAL FILE TO VIEW ITS WAVEFORM",
+        g.drawText("DROP WAV / AIFF / FLAC / MP3 HERE OR CLICK IMPORT VOCAL",
                    waveArea.reduced(20, 20), juce::Justification::centred);
     }
 
@@ -207,7 +251,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                juce::Justification::centredLeft);
     g.setColour(white);
     g.setFont(12.0f);
-    g.drawText("Word detection and individual word gain editing are the next implementation stage.",
+    g.drawText("Word detection and individual word gain editing are not implemented yet.",
                eventArea.reduced(16.0f).withTrimmedTop(42.0f),
                juce::Justification::centredLeft);
 }
@@ -216,7 +260,7 @@ void VocalDynamicsStandaloneEditor::resized()
 {
     const int width = getWidth();
     title.setBounds(30, 22, 440, 38);
-    status.setBounds(32, 62, 620, 25);
+    status.setBounds(32, 62, 650, 25);
     timeLabel.setBounds(32, 112, 400, 24);
     importButton.setBounds(width - 360, 32, 150, 42);
     playButton.setBounds(width - 200, 32, 75, 42);
