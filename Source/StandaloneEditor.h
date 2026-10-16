@@ -77,6 +77,7 @@ private:
     void selectEventAt(juce::Point<int> point);
     void updateSelectedGain();
     void exportProcessedAudio();
+    void analyzeTempoAndKey();
     juce::Rectangle<int> waveformBounds() const;
     double timeAtX(int x) const;
     void updateZoomLabel();
@@ -104,7 +105,7 @@ private:
     double viewStartSeconds = 0.0;
     double viewEndSeconds = 0.0;
 
-    juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel, zoomLabel;
+    juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel, zoomLabel, analysisLabel;
     juce::TextButton importButton { "IMPORT VOCAL" };
     juce::TextButton settingsButton { "AUDIO SETTINGS" };
     juce::TextButton playButton { "PLAY / SPACE" };
@@ -115,7 +116,8 @@ private:
     juce::TextButton zoomOutButton { "−" };
     juce::TextButton whisperExeButton { "SET WHISPER EXE" };
     juce::TextButton whisperModelButton { "SET MODEL" };
-    juce::TextButton transcribeButton { "TRANSCRIBE WORDS" };
+    juce::TextButton transcribeButton { "DETECT WORDS" };
+    juce::TextButton analysisButton { "ANALYZE BPM + KEY" };
     juce::Slider wordGainSlider;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalDynamicsStandaloneEditor)
