@@ -6,6 +6,7 @@
 class VocalDynamicsStandaloneEditor final : public juce::Component,
                                              private juce::Timer,
                                              private juce::ChangeListener,
+                                             private juce::AudioIODeviceCallback,
                                              public juce::FileDragAndDropTarget
 {
 public:
@@ -73,6 +74,13 @@ private:
     void seekFromMouse(int x);
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source);
+    void audioDeviceIOCallbackWithContext(const float* const* inputChannelData, int numInputChannels,
+        float* const* outputChannelData, int numOutputChannels, int numSamples,
+        const juce::AudioIODeviceCallbackContext& context) override;
+    void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
+    void audioDeviceStopped() override;
+    void toggleRecording();
+    void stopRecording();
     void createWordEventFromSelection();
     void selectEventAt(juce::Point<int> point);
     void updateSelectedGain();
@@ -96,6 +104,13 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<TranscriptionWorker> transcriptionWorker;
+    juce::TimeSliceThread recordingThread { "Vocal Editor recording writer" };
+    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> recordingWriter;
+    std::unique_ptr<juce::FileChooser> recordingChooser;
+    juce::CriticalSection recordingLock;
+    juce::File lastRecordingFile;
+    double recordingSampleRate = 44100.0;
+    bool recordingActive = false;
     juce::File currentFile, whisperExecutable, whisperModel;
     std::vector<WordEvent> wordEvents;
     struct PitchNote { double startSeconds = 0.0; double endSeconds = 0.0; int midiNote = 0; float confidence = 0.0f; };
@@ -113,6 +128,7 @@ private:
 
     juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel, zoomLabel, analysisLabel;
     juce::TextButton importButton { "IMPORT VOCAL" };
+    juce::TextButton recordButton { "● RECORD" };
     juce::TextButton settingsButton { "AUDIO SETTINGS" };
     juce::TextButton playButton { "PLAY / SPACE" };
     juce::TextButton stopButton { "STOP" };
