@@ -75,6 +75,7 @@ public:
 
 private:
     juce::AudioBuffer<float> scratchBuffer;
+    std::unique_ptr<juce::dsp::Oversampling<float>> truePeakOversampler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
         VocalDynamicsAudioProcessor)
