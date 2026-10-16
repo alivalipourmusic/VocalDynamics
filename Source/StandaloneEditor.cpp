@@ -199,6 +199,33 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     analysisButton.onClick = [this] { analyzeTempoAndKey(); };
     analysisButton.setTooltip("Estimate tempo (BPM) and musical key from the loaded audio.");
     addAndMakeVisible(analysisButton);
+    const char* pitchRoots[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    for (int i = 0; i < 12; ++i) rootNoteBox.addItem(pitchRoots[i], i + 1);
+    rootNoteBox.setSelectedId(1, juce::dontSendNotification);
+    scaleBox.addItem("Major", 1);
+    scaleBox.addItem("Natural Minor", 2);
+    scaleBox.addItem("Harmonic Minor", 3);
+    scaleBox.addItem("Melodic Minor", 4);
+    scaleBox.addItem("Dorian", 5);
+    scaleBox.addItem("Phrygian", 6);
+    scaleBox.addItem("Mixolydian", 7);
+    scaleBox.addItem("Major Pentatonic", 8);
+    scaleBox.addItem("Minor Pentatonic", 9);
+    scaleBox.setSelectedId(2, juce::dontSendNotification);
+    rootNoteBox.onChange = [this] { selectedRootNote = rootNoteBox.getSelectedId() - 1; repaint(); };
+    scaleBox.onChange = [this] { selectedScale = scaleBox.getSelectedId() - 1; repaint(); };
+    for (auto* combo : { &rootNoteBox, &scaleBox })
+    {
+        combo->setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff182338));
+        combo->setColour(juce::ComboBox::textColourId, white);
+        combo->setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff26374f));
+        addAndMakeVisible(*combo);
+    }
+    pitchAnalysisButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff6d4ed8));
+    pitchAnalysisButton.setColour(juce::TextButton::textColourOffId, white);
+    pitchAnalysisButton.setTooltip("Analyze monophonic pitch with autocorrelation and classify notes against the selected scale.");
+    pitchAnalysisButton.onClick = [this] { analyzePitchNotes(); };
+    addAndMakeVisible(pitchAnalysisButton);
     analysisLabel.setText("TEMPO  -- BPM     KEY  --", juce::dontSendNotification);
     analysisLabel.setColour(juce::Label::textColourId, cyan);
     analysisLabel.setFont(juce::Font(14.0f, juce::Font::bold));
@@ -237,7 +264,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     deviceManager.addAudioCallback(&audioSourcePlayer);
     refreshAudioStatus();
     startTimerHz(20);
-    setSize(1240, 760);
+    setSize(1240, 880);
 }
 
 VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
@@ -1288,6 +1315,62 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.drawText(analysisLabel.getText(), analysis.getX() + 14, analysis.getY() + 29,
                analysis.getWidth() - 190, 25, juce::Justification::centredLeft);
 
+    // Scale-aware pitch lane. Green notes belong to the selected scale; red notes do not.
+    juce::Rectangle<int> pitchLane(main.getX(), 670, main.getWidth(), 150);
+    g.setColour(surface);
+    g.fillRoundedRectangle(pitchLane.toFloat(), 5.0f);
+    g.setColour(edge);
+    g.drawRoundedRectangle(pitchLane.toFloat(), 5.0f, 1.0f);
+    g.setColour(violet);
+    g.fillRect(pitchLane.getX(), pitchLane.getY(), 3, pitchLane.getHeight());
+    g.setColour(text);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.drawText("NOTE EDITOR  /  " + rootNoteBox.getText() + " " + scaleBox.getText(),
+               pitchLane.getX() + 14, pitchLane.getY() + 8, 270, 18, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("IN-SCALE = GREEN     OUT-OF-SCALE = RED     MONOPHONIC ESTIMATE",
+               pitchLane.getX() + 14, pitchLane.getY() + 31, 360, 14, juce::Justification::centredLeft);
+    if (pitchNotes.empty())
+    {
+        g.setColour(muted);
+        g.setFont(11.0f);
+        g.drawText("Load a vocal and press ANALYZE NOTES to estimate note blobs.",
+                   pitchLane.getX() + 14, pitchLane.getY() + 68, pitchLane.getWidth() - 28, 24,
+                   juce::Justification::centredLeft);
+    }
+    else
+    {
+        const double duration = juce::jmax(0.01, thumbnail.getTotalLength());
+        const double visibleStart = viewStartSeconds;
+        const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
+        const double span = juce::jmax(0.001, visibleEnd - visibleStart);
+        const int plotTop = pitchLane.getY() + 54;
+        const int plotHeight = pitchLane.getHeight() - 64;
+        for (int semitone = 0; semitone < 25; ++semitone)
+        {
+            const int y = plotTop + semitone * plotHeight / 24;
+            g.setColour(juce::Colour(0xff243149));
+            g.drawHorizontalLine(y, static_cast<float>(pitchLane.getX() + 8), static_cast<float>(pitchLane.getRight() - 8));
+        }
+        for (const auto& note : pitchNotes)
+        {
+            if (note.endSeconds < visibleStart || note.startSeconds > visibleEnd) continue;
+            const int x1 = pitchLane.getX() + 8 + static_cast<int>((note.startSeconds - visibleStart) / span * (pitchLane.getWidth() - 16));
+            const int x2 = pitchLane.getX() + 8 + static_cast<int>((note.endSeconds - visibleStart) / span * (pitchLane.getWidth() - 16));
+            const int midiClamped = juce::jlimit(48, 72, note.midiNote);
+            const int y = plotTop + (72 - midiClamped) * plotHeight / 24;
+            const bool inScale = pitchClassAllowed(note.midiNote);
+            const auto noteColour = inScale ? juce::Colour(0xff2dd4a7) : juce::Colour(0xfff06464);
+            g.setColour(noteColour.withAlpha(0.22f));
+            g.fillRoundedRectangle(static_cast<float>(x1), static_cast<float>(y - 3),
+                                   static_cast<float>(juce::jmax(7, x2 - x1)), 8.0f, 3.0f);
+            g.setColour(noteColour);
+            g.drawRoundedRectangle(static_cast<float>(x1), static_cast<float>(y - 3),
+                                   static_cast<float>(juce::jmax(7, x2 - x1)), 8.0f, 3.0f, 1.2f);
+        }
+    }
+
     // Bottom status strip, deliberately quiet.
     g.setColour(juce::Colour(0xff0b1220));
     g.fillRect(0, getHeight() - 34, getWidth(), 34);
@@ -1334,4 +1417,7 @@ void VocalDynamicsStandaloneEditor::resized()
     analysisLabel.setBounds(waveformBounds().getX() + 14, 612,
                             waveformBounds().getWidth() - 210, 24);
     analysisButton.setBounds(waveformBounds().getRight() - 180, 598, 164, 48);
+    rootNoteBox.setBounds(waveformBounds().getX() + 150, 678, 76, 28);
+    scaleBox.setBounds(waveformBounds().getX() + 234, 678, 150, 28);
+    pitchAnalysisButton.setBounds(waveformBounds().getX() + 394, 678, 140, 28);
 }
