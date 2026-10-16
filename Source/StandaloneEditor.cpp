@@ -1113,6 +1113,9 @@ void VocalDynamicsStandaloneEditor::resized()
     const int height = getHeight();
     const int sideX = juce::jmax(600, width - 330);
     title.setBounds(28, 14, 170, 58);
+    title.setVisible(false);
+    status.setVisible(false);
+    timeLabel.setVisible(false);
     status.setBounds(32, height - 32, width - 48, 24);
     timeLabel.setBounds(285, 34, 230, 27);
 
@@ -1127,12 +1130,12 @@ void VocalDynamicsStandaloneEditor::resized()
     const int inspectorX = sideX + 16;
     const int inspectorW = juce::jmax(180, width - inspectorX - 28);
     selectedWordLabel.setBounds(inspectorX, 205, inspectorW, 34);
-    wordGainSlider.setBounds(inspectorX + 4, 365, inspectorW - 8, 104);
-    gainValueLabel.setBounds(inspectorX, 330, inspectorW, 28);
+    wordGainSlider.setBounds(inspectorX + 4, 414, inspectorW - 8, 104);
+    gainValueLabel.setBounds(inspectorX, 382, inspectorW, 28);
     settingsButton.setBounds(inspectorX, 160, inspectorW, 30);
     exportButton.setBounds(inspectorX, 248, inspectorW, 30);
     whisperExeButton.setBounds(inspectorX, 286, inspectorW, 28);
     whisperModelButton.setBounds(inspectorX, 318, inspectorW, 28);
-    transcribeButton.setBounds(inspectorX, 486, inspectorW, 34);
+    transcribeButton.setBounds(inspectorX, 354, inspectorW, 30);
     addWordButton.setBounds(inspectorX, 526, inspectorW, 26);
 }
