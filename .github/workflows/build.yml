@@ -1,0 +1,28 @@
+
+name: Build Vocal Dynamics VST3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure project
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target VocalDynamics_VST3
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalDynamics-VST3
+          path: build/VocalDynamics_artefacts/Release/VST3/
+          if-no-files-found: error
