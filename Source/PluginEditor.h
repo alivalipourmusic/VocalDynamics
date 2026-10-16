@@ -5,38 +5,54 @@
 #include "PluginProcessor.h"
 
 class VocalDynamicsAudioProcessorEditor
-    : public juce::AudioProcessorEditor
+    : public juce::AudioProcessorEditor,
+      private juce::ChangeListener
 {
 public:
     explicit VocalDynamicsAudioProcessorEditor(
-        VocalDynamicsAudioProcessor&);
+        VocalDynamicsAudioProcessor& processor);
 
-    ~VocalDynamicsAudioProcessorEditor() override = default;
+    ~VocalDynamicsAudioProcessorEditor() override;
 
-    void paint(juce::Graphics&) override;
+    void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
-    VocalDynamicsAudioProcessor& audioProcessor;
-
-    juce::Label titleLabel;
-    juce::Label subtitleLabel;
-    juce::Label gainLabel;
-    juce::Label thresholdLabel;
-
-    juce::Slider gainSlider;
-    juce::Slider thresholdSlider;
-    juce::ToggleButton gateButton;
-
     using SliderAttachment =
         juce::AudioProcessorValueTreeState::SliderAttachment;
 
     using ButtonAttachment =
         juce::AudioProcessorValueTreeState::ButtonAttachment;
 
+    void importAudio();
+    void loadAudioFile(const juce::File& file);
+
+    void changeListenerCallback(
+        juce::ChangeBroadcaster* source) override;
+
+    VocalDynamicsAudioProcessor& audioProcessor;
+
+    juce::AudioFormatManager formatManager;
+    juce::AudioThumbnailCache thumbnailCache { 5 };
+    juce::AudioThumbnail thumbnail {
+        512, formatManager, thumbnailCache
+    };
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
+
+    juce::Label titleLabel;
+    juce::Label statusLabel;
+    juce::Label durationLabel;
+
+    juce::TextButton importButton { "IMPORT VOCAL" };
+    juce::TextButton analyzeButton { "ANALYZE WORDS" };
+    juce::TextButton playButton { "PLAY" };
+
+    juce::Slider gainSlider;
+
     std::unique_ptr<SliderAttachment> gainAttachment;
-    std::unique_ptr<SliderAttachment> thresholdAttachment;
-    std::unique_ptr<ButtonAttachment> gateAttachment;
+
+    juce::File currentAudioFile;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
         VocalDynamicsAudioProcessorEditor)
