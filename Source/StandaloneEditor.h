@@ -78,6 +78,8 @@ private:
     void updateSelectedGain();
     void exportProcessedAudio();
     void analyzeTempoAndKey();
+    void analyzePitchNotes();
+    bool pitchClassAllowed(int midiNote) const;
     juce::Rectangle<int> waveformBounds() const;
     double timeAtX(int x) const;
     void updateZoomLabel();
@@ -96,6 +98,10 @@ private:
     std::unique_ptr<TranscriptionWorker> transcriptionWorker;
     juce::File currentFile, whisperExecutable, whisperModel;
     std::vector<WordEvent> wordEvents;
+    struct PitchNote { double startSeconds = 0.0; double endSeconds = 0.0; int midiNote = 0; float confidence = 0.0f; };
+    std::vector<PitchNote> pitchNotes;
+    int selectedRootNote = 0;
+    int selectedScale = 0;
     int selectedEvent = -1;
     bool isDraggingFile = false;
     bool isSelectingRange = false;
@@ -118,6 +124,10 @@ private:
     juce::TextButton whisperModelButton { "SET MODEL" };
     juce::TextButton transcribeButton { "DETECT WORDS" };
     juce::TextButton analysisButton { "ANALYZE BPM + KEY" };
+    juce::TextButton pitchAnalysisButton { "ANALYZE NOTES" };
+    juce::ComboBox rootNoteBox;
+    juce::ComboBox scaleBox;
+    juce::Label rootNoteLabel, scaleLabel;
     juce::Slider wordGainSlider;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalDynamicsStandaloneEditor)
