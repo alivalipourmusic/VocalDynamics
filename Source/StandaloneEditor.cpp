@@ -396,13 +396,16 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
     if (wordEvents.empty() || thumbnail.getTotalLength() <= 0.0)
         return;
     const double duration = thumbnail.getTotalLength();
-    const int laneX = 30;
-    const int laneWidth = getWidth() - 60;
+    const double visibleStart = viewStartSeconds;
+    const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
+    const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
+    const int laneX = 42;
+    const int laneWidth = getWidth() - 84;
     for (int i = static_cast<int>(wordEvents.size()) - 1; i >= 0; --i)
     {
         const auto& e = wordEvents[static_cast<size_t>(i)];
-        const int x1 = laneX + static_cast<int>(e.startSeconds / duration * laneWidth);
-        const int x2 = laneX + static_cast<int>(e.endSeconds / duration * laneWidth);
+        const int x1 = laneX + static_cast<int>((e.startSeconds - visibleStart) / visibleSpan * laneWidth);
+        const int x2 = laneX + static_cast<int>((e.endSeconds - visibleStart) / visibleSpan * laneWidth);
         if (point.x >= x1 && point.x <= x2)
         {
             selectedEvent = i;
