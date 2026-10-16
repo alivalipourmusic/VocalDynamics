@@ -16,7 +16,7 @@ VocalDynamicsAudioProcessorEditor(
 
     const auto white = juce::Colour(0xffedf7ff);
     const auto muted = juce::Colour(0xff8da6b9);
-    const auto cyan = juce::Colour(0xff39d9e9);
+    const auto cyan = juce::Colour(0xff54f2c2);
     const auto panel = juce::Colour(0xff111f2d);
 
     titleLabel.setText(
@@ -93,11 +93,36 @@ VocalDynamicsAudioProcessorEditor(
         juce::Slider::textBoxBackgroundColourId, panel);
     addAndMakeVisible(gainSlider);
 
-    gainAttachment =
-        std::make_unique<SliderAttachment>(
-            audioProcessor.parameters,
-            "gain",
-            gainSlider);
+    gainAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "gain", gainSlider);
+
+    targetLufsSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    targetLufsSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 24);
+    targetLufsSlider.setRange(-24.0, -9.0, 0.1);
+    targetLufsSlider.setValue(-14.0);
+    targetLufsSlider.setColour(juce::Slider::trackColourId, cyan);
+    targetLufsSlider.setColour(juce::Slider::thumbColourId, white);
+    targetLufsSlider.setColour(juce::Slider::textBoxTextColourId, white);
+    targetLufsSlider.setColour(juce::Slider::textBoxBackgroundColourId, panel);
+    addAndMakeVisible(targetLufsSlider);
+    targetLufsAttachment = std::make_unique<SliderAttachment>(audioProcessor.parameters, "targetLufs", targetLufsSlider);
+
+    const auto styleToggle = [this, white](juce::TextButton& button, juce::Colour colour)
+    {
+        button.setClickingTogglesState(true);
+        button.setColour(juce::TextButton::buttonColourId, colour);
+        button.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff1b665b));
+        button.setColour(juce::TextButton::textColourOffId, white);
+        button.setColour(juce::TextButton::textColourOnId, white);
+        addAndMakeVisible(button);
+    };
+    styleToggle(engineButton, juce::Colour(0xff243751));
+    styleToggle(riderButton, juce::Colour(0xff243751));
+    styleToggle(deEsserButton, juce::Colour(0xff243751));
+    styleToggle(bypassButton, juce::Colour(0xff563b73));
+    engineAttachment = std::make_unique<ButtonAttachment>(audioProcessor.parameters, "levelingEnabled", engineButton);
+    riderAttachment = std::make_unique<ButtonAttachment>(audioProcessor.parameters, "gainRiding", riderButton);
+    deEsserAttachment = std::make_unique<ButtonAttachment>(audioProcessor.parameters, "deEsserEnabled", deEsserButton);
+    bypassAttachment = std::make_unique<ButtonAttachment>(audioProcessor.parameters, "bypass", bypassButton);
 }
 
 VocalDynamicsAudioProcessorEditor::
@@ -283,10 +308,16 @@ void VocalDynamicsAudioProcessorEditor::paint(
         48, 610, 180, 22,
         juce::Justification::centredLeft);
 
+    g.setColour(white);
+    g.setFont(14.0f);
+    g.drawText("INTELLIGENT LEVELING ENGINE", 48, 580, 320, 22, juce::Justification::centredLeft);
+    g.setColour(muted);
+    g.setFont(11.0f);
+    g.drawText("TARGET LOUDNESS  /  APPROXIMATE RMS-BASED METERING", 48, 608, 360, 18, juce::Justification::centredLeft);
     g.setColour(cyan);
     g.setFont(11.0f);
     g.drawText(
-        "STAGE 1  |  FILE IMPORT + WAVEFORM FOUNDATION",
+        "STAGE 1  |  LEVELING DSP (LUFS METER IS APPROXIMATE)",
         30, getHeight() - 25,
         getWidth() - 60, 16,
         juce::Justification::centred);
@@ -305,4 +336,9 @@ void VocalDynamicsAudioProcessorEditor::resized()
     playButton.setBounds(width - 360, 75, 150, 30);
 
     gainSlider.setBounds(width - 190, 574, 145, 80);
+    targetLufsSlider.setBounds(380, 582, 340, 38);
+    engineButton.setBounds(380, 628, 150, 30);
+    riderButton.setBounds(540, 628, 150, 30);
+    deEsserButton.setBounds(700, 628, 150, 30);
+    bypassButton.setBounds(860, 628, 150, 30);
 }
