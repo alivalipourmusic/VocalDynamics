@@ -167,8 +167,9 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     playButton.onClick = [this] { togglePlayback(); };
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
-    addWordButton.setButtonText("DETECT WORDS FIRST");
-    addWordButton.onClick = [this] { startTranscription(); };
+    // Manual placeholder-region creation is intentionally hidden. Word events
+    // must be created by the transcription engine, not by drawing arbitrary ranges.
+    addWordButton.setVisible(false);
     zoomInButton.setButtonText("+");
     zoomOutButton.setButtonText("-"); // ASCII hyphen avoids unsupported-glyph boxes on Windows.
     zoomInButton.setTooltip("Zoom in");
@@ -722,6 +723,9 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
             selectedWordLabel.setText(e.word, juce::dontSendNotification);
             wordGainSlider.setValue(e.gainDb, juce::dontSendNotification);
             gainValueLabel.setText(juce::String(e.gainDb, 1) + " dB", juce::dontSendNotification);
+            // Selecting a detected word also places the playhead at its exact start time.
+            if (readerSource != nullptr)
+                transport.setPosition(juce::jlimit(0.0, transport.getLengthInSeconds(), e.startSeconds));
             repaint();
             return;
         }
