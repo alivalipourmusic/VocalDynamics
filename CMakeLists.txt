@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.22)
 
 project(VocalDynamics VERSION 0.1.0)
@@ -49,6 +48,38 @@ target_link_libraries(VocalDynamics
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Separate desktop editor for opening, previewing and playing vocal files.
+juce_add_gui_app(VocalDynamicsEditor
+    PRODUCT_NAME "Vocal Dynamics Editor"
+    COMPANY_NAME "Avlirecordlabel"
+    VERSION "0.1.0"
+)
+
+juce_generate_juce_header(VocalDynamicsEditor)
+
+target_sources(VocalDynamicsEditor
+    PRIVATE
+        Source/StandaloneMain.cpp
+        Source/StandaloneEditor.cpp
+        Source/StandaloneEditor.h
+)
+
+target_compile_features(VocalDynamicsEditor PRIVATE cxx_std_17)
+target_compile_definitions(VocalDynamicsEditor
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+)
+
+target_link_libraries(VocalDynamicsEditor
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_gui_extra
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
