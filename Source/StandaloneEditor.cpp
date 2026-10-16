@@ -154,7 +154,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     gainValueLabel.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(gainValueLabel);
 
-    zoomLabel.setText("ZOOM", juce::dontSendNotification);
+    zoomLabel.setText("0%", juce::dontSendNotification);
     zoomLabel.setColour(juce::Label::textColourId, muted);
     zoomLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(zoomLabel);
@@ -180,6 +180,16 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     }
 
     importButton.onClick = [this] { chooseFile(); };
+    analysisButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff263b52));
+    analysisButton.setColour(juce::TextButton::textColourOffId, white);
+    analysisButton.onClick = [this] { analyzeTempoAndKey(); };
+    analysisButton.setTooltip("Estimate tempo (BPM) and musical key from the loaded audio.");
+    addAndMakeVisible(analysisButton);
+    analysisLabel.setText("TEMPO  -- BPM     KEY  --", juce::dontSendNotification);
+    analysisLabel.setColour(juce::Label::textColourId, cyan);
+    analysisLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+    analysisLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(analysisLabel);
     settingsButton.onClick = [this] { openAudioSettings(); };
     playButton.onClick = [this] { togglePlayback(); };
     stopButton.onClick = [this] { stopPlayback(); };
@@ -191,8 +201,14 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     zoomOutButton.setButtonText("-"); // ASCII hyphen avoids unsupported-glyph boxes on Windows.
     zoomInButton.setTooltip("Zoom in");
     zoomOutButton.setTooltip("Zoom out");
-    zoomInButton.onClick = [this] { zoomBy(0.85); };
-    zoomOutButton.onClick = [this] { zoomBy(1.1764705882); };
+    zoomInButton.onClick = [this] { zoomBy(0.80); };
+    zoomOutButton.onClick = [this] { zoomBy(1.25); };
+    whisperExeButton.setButtonText("CHOOSE SPEECH ENGINE");
+    whisperModelButton.setButtonText("CHOOSE LANGUAGE MODEL");
+    transcribeButton.setButtonText("DETECT WORDS");
+    whisperExeButton.setTooltip("Choose whisper-cli.exe, the offline speech-recognition program.");
+    whisperModelButton.setTooltip("Choose a multilingual Whisper model file (.bin).");
+    transcribeButton.setTooltip("Create timed word segments from the loaded vocal.");
     whisperExeButton.onClick = [this] { chooseWhisperExecutable(); };
     whisperModelButton.onClick = [this] { chooseWhisperModel(); };
     transcribeButton.onClick = [this] { startTranscription(); };
@@ -570,25 +586,22 @@ void VocalDynamicsStandaloneEditor::stopPlayback()
 
 juce::Rectangle<int> VocalDynamicsStandaloneEditor::waveformBounds() const
 {
-    return { 28, 145, juce::jmax(520, getWidth() - 380), 285 };
+    return { 24, 142, juce::jmax(420, getWidth() - 360), 286 };
 }
 
 double VocalDynamicsStandaloneEditor::timeAtX(int x) const
 {
-    // The waveform is drawn inside a 12 px horizontal inset. Map clicks to
-    // that exact drawable area, not the outer rounded panel, otherwise seeks
-    // drift away from the point the user clicked.
-    const auto area = waveformBounds().reduced(12, 14);
-    // Playback transport is the authoritative timeline clock; do not mix it
-    // with the asynchronously generated thumbnail duration for mouse seeking.
-    const double fullDuration = transport.getLengthInSeconds();
-    if (fullDuration <= 0.0 || area.getWidth() <= 0)
+    // This is the exact horizontal area used by drawChannels(). Keep seeking,
+    // playhead drawing, and mouse scrubbing on one shared time-to-pixel mapping.
+    const auto area = waveformBounds().reduced(12, 28);
+    const double duration = transport.getLengthInSeconds();
+    if (duration <= 0.0 || area.getWidth() <= 0)
         return 0.0;
-    const double start = viewEndSeconds > viewStartSeconds ? viewStartSeconds : 0.0;
-    const double end = viewEndSeconds > start ? viewEndSeconds : fullDuration;
+    const double start = juce::jlimit(0.0, duration, viewStartSeconds);
+    const double end = viewEndSeconds > start ? juce::jlimit(start, duration, viewEndSeconds) : duration;
     const double ratio = juce::jlimit(0.0, 1.0,
         static_cast<double>(x - area.getX()) / static_cast<double>(area.getWidth()));
-    return juce::jlimit(0.0, fullDuration, start + ratio * (end - start));
+    return juce::jlimit(start, end, start + ratio * (end - start));
 }
 
 void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
@@ -602,25 +615,23 @@ void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
                       juce::dontSendNotification);
     repaint();
     if (!transport.isPlaying())
-        playButton.setButtonText("PLAY / SPACE");
+        playButton.setButtonText("PLAY");
 }
 
 void VocalDynamicsStandaloneEditor::zoomBy(double factor)
 {
-    const double total = thumbnail.getTotalLength();
+    const double total = transport.getLengthInSeconds();
     if (total <= 0.0 || factor <= 0.0)
         return;
-    const double oldSpan = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
-    // Keep zoom steps controlled and prevent extreme magnifications.
-    // Fit-to-window is 100% (the full file); maximum magnification is 100x.
-    const double minimumSpan = juce::jmax(0.05, total / 100.0);
-    const double newSpan = juce::jlimit(minimumSpan, total, oldSpan * factor);
-    // Keep the center of the visible timeline stable while zooming. The old
-    // implementation anchored to the playhead, which made the waveform appear
-    // to jump relative to the mouse/click location.
-    const double anchor = juce::jlimit(0.0, total, viewStartSeconds + oldSpan * 0.5);
-    const double anchorRatio = 0.5;
-    double newStart = anchor - anchorRatio * newSpan;
+    const double oldStart = juce::jlimit(0.0, total, viewStartSeconds);
+    const double oldEnd = viewEndSeconds > oldStart ? juce::jlimit(oldStart, total, viewEndSeconds) : total;
+    const double oldSpan = juce::jmax(0.001, oldEnd - oldStart);
+    const double minSpan = juce::jmax(0.10, total / 100.0);
+    const double newSpan = juce::jlimit(minSpan, total, oldSpan * factor);
+    // Keep the playhead at the same horizontal position while magnification changes.
+    const double playhead = juce::jlimit(oldStart, oldEnd, transport.getCurrentPosition());
+    const double ratio = oldSpan > 0.0 ? (playhead - oldStart) / oldSpan : 0.5;
+    double newStart = playhead - ratio * newSpan;
     newStart = juce::jlimit(0.0, juce::jmax(0.0, total - newSpan), newStart);
     viewStartSeconds = newStart;
     viewEndSeconds = juce::jmin(total, newStart + newSpan);
@@ -630,12 +641,10 @@ void VocalDynamicsStandaloneEditor::zoomBy(double factor)
 
 void VocalDynamicsStandaloneEditor::updateZoomLabel()
 {
-    const double total = thumbnail.getTotalLength();
+    const double total = transport.getLengthInSeconds();
     const double span = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
-    // UI zoom meter is clamped to a clear 0–100 scale: 0 = full file fit,
-    // 100 = maximum supported magnification. It never shows 200–800% values.
-    const double fraction = total > 0.0 ? 1.0 - span / total : 0.0;
-    const int percent = juce::jlimit(0, 100, static_cast<int>(std::round(fraction * 100.0)));
+    const int percent = total > 0.0
+        ? juce::jlimit(0, 100, static_cast<int>(std::round((1.0 - span / total) * 100.0))) : 0;
     zoomLabel.setText(juce::String(percent) + "%", juce::dontSendNotification);
 }
 
@@ -669,14 +678,14 @@ void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
     const auto area = waveformBounds();
-    if (thumbnail.getTotalLength() > 0.0 && area.contains(event.getPosition()))
+    if (thumbnail.getTotalLength() > 0.0 && area.reduced(12, 28).contains(event.getPosition()))
     {
         // Follow the clicked position immediately. A drag scrubs the playhead;
         // it must not create a fake word region.
         seekFromMouse(event.x);
         isSelectingRange = true;
         mouseMovedOnWave = false;
-        const auto drawable = area.reduced(12, 14);
+        const auto drawable = area.reduced(12, 28);
         selectionStartX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
         selectionCurrentX = selectionStartX;
         return;
@@ -692,7 +701,7 @@ void VocalDynamicsStandaloneEditor::mouseDrag(const juce::MouseEvent& event)
     {
         if (std::abs(event.x - selectionStartX) > 3)
             mouseMovedOnWave = true;
-        const auto drawable = waveformBounds().reduced(12, 14);
+        const auto drawable = waveformBounds().reduced(12, 28);
         selectionCurrentX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
         repaint();
     }
