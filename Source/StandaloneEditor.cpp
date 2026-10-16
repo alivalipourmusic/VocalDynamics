@@ -1166,7 +1166,7 @@ void VocalDynamicsStandaloneEditor::audioDeviceAboutToStart(juce::AudioIODevice*
 
 void VocalDynamicsStandaloneEditor::audioDeviceStopped()
 {
-    stopRecording();
+    juce::MessageManager::callAsync([this] { stopRecording(); });
 }
 
 void VocalDynamicsStandaloneEditor::audioDeviceIOCallbackWithContext(
