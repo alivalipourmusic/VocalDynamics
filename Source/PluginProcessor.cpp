@@ -121,12 +121,6 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             inputEnergy += static_cast<double>(x) * x;
             const size_t channel = static_cast<size_t>(juce::jmin(ch, 1));
             const float previous = previousSamples[channel];
-            blockTruePeak = juce::jmax(blockTruePeak, std::abs(x));
-            for (int phase = 1; phase < 4; ++phase)
-            {
-                const float fraction = static_cast<float>(phase) * 0.25f;
-                blockTruePeak = juce::jmax(blockTruePeak, std::abs(previous + (x - previous) * fraction));
-            }
             previousSamples[channel] = x;
         }
         const float instantLevel = std::sqrt(detectorEnergy / static_cast<float>(juce::jmax(1, inputChannels)));
@@ -204,8 +198,10 @@ void VocalDynamicsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (size_t channel = 0; channel < oversampledBlock.getNumChannels(); ++channel)
             for (size_t sample = 0; sample < oversampledBlock.getNumSamples(); ++sample)
                 oversampledPeak = juce::jmax(oversampledPeak, std::abs(oversampledBlock.getSample(channel, sample)));
-        blockTruePeak = juce::jmax(blockTruePeak, oversampledPeak);
+        blockTruePeak = oversampledPeak;
     }
+    else
+        blockTruePeak = buffer.getMagnitude(0, samples);
     measuredTruePeakDbtp.store(juce::Decibels::gainToDecibels(blockTruePeak), std::memory_order_relaxed);
     measuredGainReductionDb.store(juce::Decibels::gainToDecibels(juce::jmax(smoothedCompressorGain, 1.0e-5f)),
         std::memory_order_relaxed);
