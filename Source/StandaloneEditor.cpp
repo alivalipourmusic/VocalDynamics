@@ -1123,16 +1123,32 @@ void VocalDynamicsStandaloneEditor::exportProcessedAudio()
                     break;
                 }
 
+                static float lowState[64] = {}, midState[64] = {};
                 for (int sample = 0; sample < count; ++sample)
                 {
                     const double time = static_cast<double>(position + sample) / reader->sampleRate;
                     float gain = 1.0f;
+                    float lowDb = safeThis->globalLowDb, midDb = safeThis->globalMidDb, highDb = safeThis->globalHighDb;
                     for (const auto& e : safeThis->wordEvents)
                         if (time >= e.startSeconds && time < e.endSeconds)
+                        {
                             gain = juce::Decibels::decibelsToGain(e.gainDb);
-                    if (gain != 1.0f)
-                        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
-                            buffer.getWritePointer(channel)[sample] *= gain;
+                            lowDb = e.lowDb; midDb = e.midDb; highDb = e.highDb;
+                        }
+                    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+                    {
+                        auto* data = buffer.getWritePointer(channel);
+                        const float input = data[sample];
+                        const int stateChannel = channel % 64;
+                        lowState[stateChannel] += 0.055f * (input - lowState[stateChannel]);
+                        midState[stateChannel] += 0.22f * (input - midState[stateChannel]);
+                        const float low = lowState[stateChannel];
+                        const float mid = midState[stateChannel] - lowState[stateChannel];
+                        const float high = input - midState[stateChannel];
+                        data[sample] = (low * juce::Decibels::decibelsToGain(lowDb)
+                                      + mid * juce::Decibels::decibelsToGain(midDb)
+                                      + high * juce::Decibels::decibelsToGain(highDb)) * gain;
+                    }
                 }
 
                 if (!writer->writeFromAudioSampleBuffer(buffer, 0, count))
@@ -1598,11 +1614,18 @@ void VocalDynamicsStandaloneEditor::resized()
     selectedWordLabel.setBounds(innerX, 210, innerW, 30);
     gainValueLabel.setBounds(innerX, 310, innerW, 24);
     wordGainSlider.setBounds(innerX, 336, innerW, 72);
-    settingsButton.setBounds(innerX, 410, innerW, 28);
-    exportButton.setBounds(innerX, 444, innerW, 28);
-    whisperExeButton.setBounds(innerX, 490, innerW, 26);
-    whisperModelButton.setBounds(innerX, 520, innerW, 26);
-    transcribeButton.setBounds(innerX, 550, innerW, 28);
+    eqTitle.setBounds(innerX, 408, innerW, 22);
+    lowEqLabel.setBounds(innerX, 432, 42, 22);
+    lowEqSlider.setBounds(innerX + 42, 432, innerW - 42, 22);
+    midEqLabel.setBounds(innerX, 456, 42, 22);
+    midEqSlider.setBounds(innerX + 42, 456, innerW - 42, 22);
+    highEqLabel.setBounds(innerX, 480, 42, 22);
+    highEqSlider.setBounds(innerX + 42, 480, innerW - 42, 22);
+    settingsButton.setBounds(innerX, 510, innerW, 28);
+    exportButton.setBounds(innerX, 544, innerW, 28);
+    whisperExeButton.setBounds(innerX, 584, innerW, 26);
+    whisperModelButton.setBounds(innerX, 614, innerW, 26);
+    transcribeButton.setBounds(innerX, 644, innerW, 28);
     addWordButton.setVisible(false);
 
     analysisLabel.setBounds(wave.getX() + 14, 612, juce::jmax(160, wave.getWidth() - 210), 24);
