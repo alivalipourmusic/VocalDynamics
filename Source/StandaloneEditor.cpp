@@ -1,5 +1,62 @@
 #include "StandaloneEditor.h"
 
+VocalDynamicsStandaloneEditor::TranscriptionWorker::TranscriptionWorker(
+    juce::File executable, juce::File model, juce::File audio, juce::File outputSrt,
+    std::function<void(bool, juce::String)> completion)
+    : juce::Thread("Offline word transcription"),
+      executableFile(std::move(executable)), modelFile(std::move(model)),
+      audioFile(std::move(audio)), srtFile(std::move(outputSrt)),
+      onFinished(std::move(completion))
+{
+}
+
+void VocalDynamicsStandaloneEditor::TranscriptionWorker::run()
+{
+    juce::StringArray args;
+    args.add(executableFile.getFullPathName());
+    args.add("-m"); args.add(modelFile.getFullPathName());
+    args.add("-f"); args.add(audioFile.getFullPathName());
+    args.add("-osrt");
+    args.add("-of"); args.add(srtFile.withFileExtension("").getFullPathName());
+    args.add("-ml"); args.add("1");
+    args.add("-sow");
+    args.add("-l"); args.add("auto");
+    args.add("-np");
+
+    juce::ChildProcess process;
+    if (!process.start(args, 0))
+    {
+        juce::MessageManager::callAsync([callback = onFinished]
+        {
+            if (callback) callback(false, "Could not launch whisper-cli.exe. Check the executable path.");
+        });
+        return;
+    }
+
+    while (!threadShouldExit())
+    {
+        if (process.waitForProcessToFinish(150))
+            break;
+    }
+
+    if (threadShouldExit())
+    {
+        process.kill();
+        return;
+    }
+
+    const bool outputExists = srtFile.existsAsFile() && srtFile.getSize() > 0;
+    const int exitCode = process.getExitCode();
+    const juce::String message = outputExists
+        ? "SRT_READY"
+        : "Whisper finished without an SRT file (exit code " + juce::String(exitCode) + "). Check model compatibility and audio format.";
+
+    juce::MessageManager::callAsync([callback = onFinished, outputExists, message]
+    {
+        if (callback) callback(outputExists, message);
+    });
+}
+
 void VocalDynamicsStandaloneEditor::EventGainSource::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
@@ -94,7 +151,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
     addAndMakeVisible(wordGainSlider);
 
-    for (auto* button : { &importButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton })
+    for (auto* button : { &importButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
     {
         button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff164252));
         button->setColour(juce::TextButton::textColourOffId, white);
@@ -108,6 +165,9 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     addWordButton.onClick = [this] { createWordEventFromSelection(); };
     zoomInButton.onClick = [this] { zoomBy(0.5); };
     zoomOutButton.onClick = [this] { zoomBy(2.0); };
+    whisperExeButton.onClick = [this] { chooseWhisperExecutable(); };
+    whisperModelButton.onClick = [this] { chooseWhisperModel(); };
+    transcribeButton.onClick = [this] { startTranscription(); };
     setWantsKeyboardFocus(true);
     setFocusContainerType(juce::Component::FocusContainerType::keyboardFocusContainer);
 
@@ -123,6 +183,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
 VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
 {
+    if (transcriptionWorker != nullptr)
+        transcriptionWorker->stopThread(3000);
     stopTimer();
     thumbnail.removeChangeListener(this);
     deviceManager.removeAudioCallback(&audioSourcePlayer);
@@ -169,6 +231,170 @@ void VocalDynamicsStandaloneEditor::chooseFile()
                     safeThis->loadFile(selected);
             }
         });
+}
+
+void VocalDynamicsStandaloneEditor::chooseWhisperExecutable()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Select whisper-cli.exe (whisper.cpp)", juce::File{}, "*.exe");
+    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this)](const juce::FileChooser& chooser)
+        {
+            if (safeThis != nullptr)
+            {
+                const auto f = chooser.getResult();
+                if (f.existsAsFile())
+                {
+                    safeThis->whisperExecutable = f;
+                    safeThis->status.setText("Whisper executable set: " + f.getFileName(), juce::dontSendNotification);
+                }
+            }
+        });
+}
+
+void VocalDynamicsStandaloneEditor::chooseWhisperModel()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Select a multilingual Whisper GGML model", juce::File{}, "*.bin");
+    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this)](const juce::FileChooser& chooser)
+        {
+            if (safeThis != nullptr)
+            {
+                const auto f = chooser.getResult();
+                if (f.existsAsFile())
+                {
+                    safeThis->whisperModel = f;
+                    safeThis->status.setText("Offline model set: " + f.getFileName(), juce::dontSendNotification);
+                }
+            }
+        });
+}
+
+void VocalDynamicsStandaloneEditor::startTranscription()
+{
+    if (!currentFile.existsAsFile())
+    {
+        status.setText("Import a vocal file before transcription.", juce::dontSendNotification);
+        return;
+    }
+    if (!whisperExecutable.existsAsFile() || !whisperModel.existsAsFile())
+    {
+        status.setText("Set whisper-cli.exe and a multilingual GGML model first.", juce::dontSendNotification);
+        return;
+    }
+    if (transcriptionWorker != nullptr && transcriptionWorker->isThreadRunning())
+    {
+        status.setText("Word detection is already running.", juce::dontSendNotification);
+        return;
+    }
+
+    const auto temp = juce::File::getSpecialLocation(juce::File::tempDirectory);
+    const auto stem = "VocalDynamics_words_" + juce::String(juce::Time::getMillisecondCounter());
+    const auto srt = temp.getChildFile(stem + ".srt");
+    srt.deleteFile();
+
+    status.setText("Offline transcription running. Long vocals can take several minutes...", juce::dontSendNotification);
+    transcribeButton.setEnabled(false);
+
+    transcriptionWorker = std::make_unique<TranscriptionWorker>(
+        whisperExecutable, whisperModel, currentFile, srt,
+        [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this), srt]
+        (bool success, juce::String message)
+        {
+            if (safeThis == nullptr) return;
+            safeThis->transcribeButton.setEnabled(true);
+            if (!success)
+            {
+                safeThis->status.setText(message, juce::dontSendNotification);
+                return;
+            }
+            const auto content = srt.loadFileAsString();
+            safeThis->applyTranscriptionResult(content.isNotEmpty(), content.isNotEmpty()
+                ? content : "Transcription output file was empty.");
+        });
+    transcriptionWorker->startThread();
+}
+
+static double parseWhisperTimestamp(juce::String value)
+{
+    value = value.trim().replaceCharacter(',', '.');
+    juce::StringArray hms;
+    hms.addTokens(value, ":", "");
+    if (hms.size() != 3) return -1.0;
+    juce::StringArray secParts;
+    secParts.addTokens(hms[2], ".", "");
+    if (secParts.isEmpty()) return -1.0;
+    const double hours = hms[0].getDoubleValue();
+    const double minutes = hms[1].getDoubleValue();
+    const double seconds = secParts[0].getDoubleValue();
+    double fraction = 0.0;
+    if (secParts.size() > 1)
+    {
+        auto digits = secParts[1];
+        while (digits.length() < 3) digits += "0";
+        fraction = digits.substring(0, 3).getDoubleValue() / 1000.0;
+    }
+    return hours * 3600.0 + minutes * 60.0 + seconds + fraction;
+}
+
+bool VocalDynamicsStandaloneEditor::parseSrt(const juce::String& content, std::vector<WordEvent>& result)
+{
+    juce::StringArray lines;
+    lines.addLines(content);
+    for (int i = 0; i < lines.size(); ++i)
+    {
+        auto line = lines[i].trim();
+        if (!line.contains("-->")) continue;
+        const int arrow = line.indexOf("-->");
+        const double start = parseWhisperTimestamp(line.substring(0, arrow));
+        const double end = parseWhisperTimestamp(line.substring(arrow + 3));
+        if (start < 0.0 || end <= start) continue;
+
+        juce::String text;
+        for (int j = i + 1; j < lines.size() && lines[j].trim().isNotEmpty(); ++j)
+        {
+            if (text.isNotEmpty()) text += " ";
+            text += lines[j].trim();
+        }
+        text = text.trim();
+        if (text.isEmpty()) continue;
+
+        WordEvent event;
+        event.word = text;
+        event.startSeconds = start;
+        event.endSeconds = end;
+        event.gainDb = 0.0f;
+        result.push_back(event);
+    }
+    return !result.empty();
+}
+
+void VocalDynamicsStandaloneEditor::applyTranscriptionResult(bool success, const juce::String& message)
+{
+    if (!success)
+    {
+        status.setText(message, juce::dontSendNotification);
+        return;
+    }
+    std::vector<WordEvent> detected;
+    if (!parseSrt(message, detected))
+    {
+        status.setText("No timed words were found. Check Whisper model and input format.", juce::dontSendNotification);
+        return;
+    }
+
+    wordEvents = std::move(detected);
+    selectedEvent = wordEvents.empty() ? -1 : 0;
+    if (selectedEvent >= 0)
+    {
+        selectedWordLabel.setText(wordEvents[0].word, juce::dontSendNotification);
+        wordGainSlider.setValue(wordEvents[0].gainDb, juce::dontSendNotification);
+    }
+    status.setText("Detected " + juce::String(static_cast<int>(wordEvents.size()))
+                   + " timed word segments. Review boundaries and correct any mistakes.",
+                   juce::dontSendNotification);
+    repaint();
 }
 
 void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
@@ -660,5 +886,8 @@ void VocalDynamicsStandaloneEditor::resized()
     selectedWordLabel.setBounds(44, 548, 180, 28);
     wordGainSlider.setBounds(235, 550, width - 405, 24);
     gainValueLabel.setBounds(width - 155, 548, 95, 28);
-    addWordButton.setBounds(44, 584, 170, 30);
+    addWordButton.setBounds(44, 584, 150, 30);
+    whisperExeButton.setBounds(210, 584, 130, 30);
+    whisperModelButton.setBounds(346, 584, 100, 30);
+    transcribeButton.setBounds(452, 584, 160, 30);
 }
