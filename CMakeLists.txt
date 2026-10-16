@@ -18,7 +18,7 @@ juce_add_plugin(VocalDynamics
     BUNDLE_ID "com.avlirecordlabel.vocaldynamics"
     PLUGIN_MANUFACTURER_CODE Avlr
     PLUGIN_CODE Vdyn
-    FORMATS VST3
+    FORMATS VST3 Standalone
     VST3_CAN_REPLACE_VST2 TRUE
     PRODUCT_NAME "Vocal Dynamics"
     IS_SYNTH FALSE
