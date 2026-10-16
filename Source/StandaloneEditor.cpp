@@ -68,7 +68,7 @@ void VocalDynamicsStandaloneEditor::TranscriptionWorker::run()
     const int exitCode = process.getExitCode();
     const juce::String message = outputExists
         ? "SRT_READY"
-        : "Whisper finished without an SRT file (exit code " + juce::String(exitCode) + "). Check model compatibility and audio format.";
+        : "Word detection could not create timed words (error " + juce::String(exitCode) + "). Check the speech app and language pack.";
 
     juce::MessageManager::callAsync([callback = onFinished, outputExists, message]
     {
@@ -344,7 +344,7 @@ void VocalDynamicsStandaloneEditor::chooseFile()
 void VocalDynamicsStandaloneEditor::chooseWhisperExecutable()
 {
     fileChooser = std::make_unique<juce::FileChooser>(
-        "Select whisper-cli.exe (whisper.cpp)", juce::File{}, "*.exe");
+        "Choose the offline speech-recognition app (whisper-cli.exe)", juce::File{}, "*.exe");
     fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
         [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this)](const juce::FileChooser& chooser)
         {
@@ -363,7 +363,7 @@ void VocalDynamicsStandaloneEditor::chooseWhisperExecutable()
 void VocalDynamicsStandaloneEditor::chooseWhisperModel()
 {
     fileChooser = std::make_unique<juce::FileChooser>(
-        "Select a multilingual Whisper GGML model", juce::File{}, "*.bin");
+        "Choose a multilingual speech model (.bin)", juce::File{}, "*.bin");
     fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
         [safeThis = juce::Component::SafePointer<VocalDynamicsStandaloneEditor>(this)](const juce::FileChooser& chooser)
         {
@@ -388,7 +388,7 @@ void VocalDynamicsStandaloneEditor::startTranscription()
     }
     if (!whisperExecutable.existsAsFile() || !whisperModel.existsAsFile())
     {
-        status.setText("Set whisper-cli.exe and a multilingual GGML model first.", juce::dontSendNotification);
+        status.setText("Choose the speech-recognition app and language pack first.", juce::dontSendNotification);
         return;
     }
     if (transcriptionWorker != nullptr && transcriptionWorker->isThreadRunning())
@@ -1253,16 +1253,8 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                          static_cast<float>(inspector.getRight() - 12));
     g.setColour(text);
     g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("WORD DETECTION", inspector.getX() + 14, inspector.getY() + 264,
-               inspector.getWidth() - 26, 18, juce::Justification::centredLeft);
-    g.setColour(muted);
-    g.setFont(10.0f);
-    g.drawText("Choose a speech app and language pack once,",
-               inspector.getX() + 14, inspector.getY() + 285, inspector.getWidth() - 24, 14,
-               juce::Justification::centredLeft);
-    g.drawText("then press Detect Words to create timed regions.",
-               inspector.getX() + 14, inspector.getY() + 300, inspector.getWidth() - 24, 14,
-               juce::Justification::centredLeft);
+    g.drawText("WORD DETECTION  /  SET UP ONCE", inspector.getX() + 14, inspector.getY() + 326,
+               inspector.getWidth() - 26, 14, juce::Justification::centredLeft);
 
     juce::Rectangle<int> analysis(main.getX(), 584, main.getWidth(), 76);
     g.setColour(surface);
