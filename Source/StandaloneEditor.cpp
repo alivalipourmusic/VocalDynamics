@@ -212,6 +212,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     scaleBox.addItem("Major Pentatonic", 8);
     scaleBox.addItem("Minor Pentatonic", 9);
     scaleBox.setSelectedId(2, juce::dontSendNotification);
+    selectedScale = 1; // Natural minor is the visible default.
     rootNoteBox.onChange = [this] { selectedRootNote = rootNoteBox.getSelectedId() - 1; repaint(); };
     scaleBox.onChange = [this] { selectedScale = scaleBox.getSelectedId() - 1; repaint(); };
     for (auto* combo : { &rootNoteBox, &scaleBox })
@@ -546,6 +547,7 @@ void VocalDynamicsStandaloneEditor::applyTranscriptionResult(bool success, const
 
 void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
 {
+    pitchNotes.clear();
     if (!file.existsAsFile())
         return;
 
