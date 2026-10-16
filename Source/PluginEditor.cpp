@@ -20,7 +20,7 @@ VocalDynamicsAudioProcessorEditor(
     const auto panel = juce::Colour(0xff111f2d);
 
     titleLabel.setText(
-        "VOCAL DYNAMICS",
+        "VOCAL EDITOR",
         juce::dontSendNotification);
     titleLabel.setFont(
         juce::Font(27.0f, juce::Font::bold));
@@ -29,7 +29,7 @@ VocalDynamicsAudioProcessorEditor(
     addAndMakeVisible(titleLabel);
 
     statusLabel.setText(
-        "WORD-LEVEL DYNAMICS EDITOR  /  STAGE 1",
+        "PRECISION VOCAL WORKSTATION",
         juce::dontSendNotification);
     statusLabel.setFont(juce::Font(12.0f));
     statusLabel.setColour(
