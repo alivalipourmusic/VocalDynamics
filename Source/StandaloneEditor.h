@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <vector>
+#include <functional>
 
 class VocalDynamicsStandaloneEditor final : public juce::Component,
                                              private juce::Timer,
@@ -44,7 +45,23 @@ private:
         double currentSampleRate = 44100.0;
     };
 
+    class TranscriptionWorker final : public juce::Thread
+    {
+    public:
+        TranscriptionWorker(juce::File executable, juce::File model, juce::File audio,
+                            juce::File outputSrt, std::function<void(bool, juce::String)> completion);
+        void run() override;
+    private:
+        juce::File executableFile, modelFile, audioFile, srtFile;
+        std::function<void(bool, juce::String)> onFinished;
+    };
+
     void chooseFile();
+    void chooseWhisperExecutable();
+    void chooseWhisperModel();
+    void startTranscription();
+    void applyTranscriptionResult(bool success, const juce::String& message);
+    bool parseSrt(const juce::String& content, std::vector<WordEvent>& result);
     void loadFile(const juce::File& file);
     void togglePlayback();
     void stopPlayback();
@@ -71,7 +88,8 @@ private:
     juce::TimeSliceThread readAheadThread { "Vocal Dynamics audio read-ahead" };
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
     std::unique_ptr<juce::FileChooser> fileChooser;
-    juce::File currentFile;
+    std::unique_ptr<TranscriptionWorker> transcriptionWorker;
+    juce::File currentFile, whisperExecutable, whisperModel;
     std::vector<WordEvent> wordEvents;
     int selectedEvent = -1;
     bool isDraggingFile = false;
@@ -90,6 +108,9 @@ private:
     juce::TextButton addWordButton { "ADD REGION" };
     juce::TextButton zoomInButton { "+" };
     juce::TextButton zoomOutButton { "−" };
+    juce::TextButton whisperExeButton { "SET WHISPER EXE" };
+    juce::TextButton whisperModelButton { "SET MODEL" };
+    juce::TextButton transcribeButton { "TRANSCRIBE WORDS" };
     juce::Slider wordGainSlider;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalDynamicsStandaloneEditor)
