@@ -80,6 +80,11 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     gainValueLabel.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(gainValueLabel);
 
+    zoomLabel.setText("100%", juce::dontSendNotification);
+    zoomLabel.setColour(juce::Label::textColourId, muted);
+    zoomLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(zoomLabel);
+
     wordGainSlider.setRange(-24.0, 12.0, 0.1);
     wordGainSlider.setValue(0.0);
     wordGainSlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -89,7 +94,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
     addAndMakeVisible(wordGainSlider);
 
-    for (auto* button : { &importButton, &playButton, &stopButton, &exportButton, &addWordButton })
+    for (auto* button : { &importButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton })
     {
         button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff164252));
         button->setColour(juce::TextButton::textColourOffId, white);
@@ -101,6 +106,10 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
     addWordButton.onClick = [this] { createWordEventFromSelection(); };
+    zoomInButton.onClick = [this] { zoomBy(0.5); };
+    zoomOutButton.onClick = [this] { zoomBy(2.0); };
+    setWantsKeyboardFocus(true);
+    setFocusContainerType(juce::Component::FocusContainerType::keyboardFocusContainer);
 
     const auto setupResult = deviceManager.initialiseWithDefaultDevices(0, 2);
     if (setupResult.isNotEmpty())
@@ -190,6 +199,8 @@ void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
     readerSource = std::move(newSource);
 
     currentFile = file;
+    viewStartSeconds = 0.0;
+    viewEndSeconds = readerSource->getTotalLength();
     wordEvents.clear();
     selectedEvent = -1;
     selectedWordLabel.setText("No region selected", juce::dontSendNotification);
@@ -238,20 +249,84 @@ juce::Rectangle<int> VocalDynamicsStandaloneEditor::waveformBounds() const
 
 double VocalDynamicsStandaloneEditor::timeAtX(int x) const
 {
-    const auto duration = thumbnail.getTotalLength();
     const auto area = waveformBounds();
-    if (duration <= 0.0 || area.getWidth() <= 0)
+    const double fullDuration = thumbnail.getTotalLength();
+    if (fullDuration <= 0.0 || area.getWidth() <= 0)
         return 0.0;
-    return juce::jlimit(0.0, duration,
-        static_cast<double>(x - area.getX()) / static_cast<double>(area.getWidth()) * duration);
+    const double start = viewEndSeconds > viewStartSeconds ? viewStartSeconds : 0.0;
+    const double end = viewEndSeconds > start ? viewEndSeconds : fullDuration;
+    return juce::jlimit(0.0, fullDuration,
+        start + static_cast<double>(x - area.getX()) / static_cast<double>(area.getWidth()) * (end - start));
+}
+
+void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
+{
+    if (thumbnail.getTotalLength() <= 0.0 || readerSource == nullptr)
+        return;
+    transport.setPosition(timeAtX(x));
+    if (!transport.isPlaying())
+        playButton.setButtonText("PLAY / SPACE");
+}
+
+void VocalDynamicsStandaloneEditor::zoomBy(double factor)
+{
+    const double total = thumbnail.getTotalLength();
+    if (total <= 0.0 || factor <= 0.0)
+        return;
+    const double oldSpan = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
+    const double newSpan = juce::jlimit(0.5, total, oldSpan * factor);
+    const double anchor = juce::jlimit(0.0, total, transport.getCurrentPosition());
+    const double anchorRatio = (anchor - viewStartSeconds) / juce::jmax(0.001, oldSpan);
+    double newStart = anchor - anchorRatio * newSpan;
+    newStart = juce::jlimit(0.0, juce::jmax(0.0, total - newSpan), newStart);
+    viewStartSeconds = newStart;
+    viewEndSeconds = juce::jmin(total, newStart + newSpan);
+    updateZoomLabel();
+    repaint();
+}
+
+void VocalDynamicsStandaloneEditor::updateZoomLabel()
+{
+    const double total = thumbnail.getTotalLength();
+    const double span = viewEndSeconds > viewStartSeconds ? viewEndSeconds - viewStartSeconds : total;
+    const double zoom = span > 0.0 ? total / span * 100.0 : 100.0;
+    zoomLabel.setText(juce::String(static_cast<int>(zoom)) + "%", juce::dontSendNotification);
+}
+
+bool VocalDynamicsStandaloneEditor::keyPressed(const juce::KeyPress& key)
+{
+    if (key.getKeyCode() == juce::KeyPress::spaceKey)
+    {
+        togglePlayback();
+        return true;
+    }
+    if (key.getTextCharacter() == '+' || key.getKeyCode() == juce::KeyPress::numberPadAdd)
+    {
+        zoomBy(0.5);
+        return true;
+    }
+    if (key.getTextCharacter() == '-' || key.getTextCharacter() == '_' ||
+        key.getKeyCode() == juce::KeyPress::numberPadSubtract)
+    {
+        zoomBy(2.0);
+        return true;
+    }
+    if (key.getKeyCode() == juce::KeyPress::escapeKey)
+    {
+        stopPlayback();
+        return true;
+    }
+    return false;
 }
 
 void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
 {
+    grabKeyboardFocus();
     const auto area = waveformBounds();
     if (thumbnail.getTotalLength() > 0.0 && area.contains(event.getPosition()))
     {
         isSelectingRange = true;
+        mouseMovedOnWave = false;
         selectionStartX = juce::jlimit(area.getX(), area.getRight(), event.x);
         selectionCurrentX = selectionStartX;
         return;
@@ -265,6 +340,8 @@ void VocalDynamicsStandaloneEditor::mouseDrag(const juce::MouseEvent& event)
 {
     if (isSelectingRange)
     {
+        if (std::abs(event.x - selectionStartX) > 3)
+            mouseMovedOnWave = true;
         selectionCurrentX = juce::jlimit(waveformBounds().getX(), waveformBounds().getRight(), event.x);
         repaint();
     }
@@ -276,9 +353,11 @@ void VocalDynamicsStandaloneEditor::mouseUp(const juce::MouseEvent& event)
         return;
     selectionCurrentX = juce::jlimit(waveformBounds().getX(), waveformBounds().getRight(), event.x);
     isSelectingRange = false;
-    repaint();
-    if (std::abs(selectionCurrentX - selectionStartX) >= 5)
+    if (mouseMovedOnWave && std::abs(selectionCurrentX - selectionStartX) >= 5)
         createWordEventFromSelection();
+    else
+        seekFromMouse(event.x);
+    repaint();
 }
 
 void VocalDynamicsStandaloneEditor::createWordEventFromSelection()
@@ -480,7 +559,9 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     if (thumbnail.getTotalLength() > 0.0)
     {
         g.setColour(cyan);
-        thumbnail.drawChannels(g, waveArea.reduced(12, 14), 0.0, thumbnail.getTotalLength(), 1.0f);
+        const double visibleStart = viewStartSeconds;
+        const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : thumbnail.getTotalLength();
+        thumbnail.drawChannels(g, waveArea.reduced(12, 14), visibleStart, visibleEnd, 1.0f);
 
         if (isSelectingRange)
         {
@@ -493,8 +574,10 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         const auto duration = transport.getLengthInSeconds();
         if (duration > 0.0)
         {
+            const double visibleStart = viewStartSeconds;
+            const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
             const auto x = waveArea.getX() + static_cast<int>(
-                (transport.getCurrentPosition() / duration) * waveArea.getWidth());
+                ((transport.getCurrentPosition() - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * waveArea.getWidth());
             g.setColour(white);
             g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 8), static_cast<float>(waveArea.getBottom() - 8));
         }
@@ -527,13 +610,16 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     else
     {
         const double duration = thumbnail.getTotalLength();
+        const double visibleStart = viewStartSeconds;
+        const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
+        const double visibleSpan = juce::jmax(0.001, visibleEnd - visibleStart);
         const int laneX = 42;
         const int laneWidth = getWidth() - 84;
         for (int i = 0; i < static_cast<int>(wordEvents.size()); ++i)
         {
             const auto& e = wordEvents[static_cast<size_t>(i)];
-            const int x1 = laneX + static_cast<int>(e.startSeconds / duration * laneWidth);
-            const int x2 = laneX + static_cast<int>(e.endSeconds / duration * laneWidth);
+            const int x1 = laneX + static_cast<int>((e.startSeconds - visibleStart) / visibleSpan * laneWidth);
+            const int x2 = laneX + static_cast<int>((e.endSeconds - visibleStart) / visibleSpan * laneWidth);
             juce::Rectangle<float> block(static_cast<float>(x1), 500.0f,
                                          static_cast<float>(juce::jmax(8, x2 - x1)), 46.0f);
             g.setColour(i == selectedEvent ? juce::Colour(0xff246e7b) : juce::Colour(0xff263b54));
@@ -560,10 +646,13 @@ void VocalDynamicsStandaloneEditor::resized()
     status.setBounds(32, 62, 600, 25);
     timeLabel.setBounds(32, 112, 220, 24);
 
-    importButton.setBounds(width - 470, 32, 130, 42);
-    playButton.setBounds(width - 330, 32, 75, 42);
-    stopButton.setBounds(width - 245, 32, 70, 42);
-    exportButton.setBounds(width - 165, 32, 130, 42);
+    importButton.setBounds(width - 530, 32, 125, 42);
+    playButton.setBounds(width - 395, 32, 105, 42);
+    stopButton.setBounds(width - 280, 32, 65, 42);
+    zoomOutButton.setBounds(width - 205, 32, 38, 42);
+    zoomLabel.setBounds(width - 165, 32, 55, 42);
+    zoomInButton.setBounds(width - 105, 32, 38, 42);
+    exportButton.setBounds(width - 530, 112, 125, 30);
 
     selectedWordLabel.setBounds(44, 548, 180, 28);
     wordGainSlider.setBounds(235, 550, width - 405, 24);
