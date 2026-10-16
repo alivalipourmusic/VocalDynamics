@@ -32,13 +32,14 @@ private:
         double startSeconds = 0.0;
         double endSeconds = 0.0;
         float gainDb = 0.0f;
+        float lowDb = 0.0f, midDb = 0.0f, highDb = 0.0f;
     };
 
     class EventGainSource final : public juce::AudioSource
     {
     public:
         explicit EventGainSource(juce::AudioTransportSource& source) : transport(source) {}
-        void setEvents(const std::vector<WordEvent>* newEvents) { events = newEvents; }
+        void setEvents(const std::vector<WordEvent>* newEvents, const float* globalLow, const float* globalMid, const float* globalHigh) { events = newEvents; lowGlobal = globalLow; midGlobal = globalMid; highGlobal = globalHigh; }
         void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
         void releaseResources() override;
         void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override;
@@ -46,6 +47,8 @@ private:
         juce::AudioTransportSource& transport;
         const std::vector<WordEvent>* events = nullptr;
         double currentSampleRate = 44100.0;
+        const float* lowGlobal = nullptr; const float* midGlobal = nullptr; const float* highGlobal = nullptr;
+        float lowState[2] = {}, midState[2] = {};
     };
 
     class TranscriptionWorker final : public juce::Thread
@@ -84,6 +87,7 @@ private:
     void createWordEventFromSelection();
     void selectEventAt(juce::Point<int> point);
     void updateSelectedGain();
+    void updateSelectedEQ();
     void exportProcessedAudio();
     void analyzeTempoAndKey();
     void analyzePitchNotes();
@@ -145,6 +149,9 @@ private:
     juce::ComboBox scaleBox;
     juce::Label rootNoteLabel, scaleLabel;
     juce::Slider wordGainSlider;
+    juce::Slider lowEqSlider, midEqSlider, highEqSlider;
+    juce::Label eqTitle, lowEqLabel, midEqLabel, highEqLabel;
+    float globalLowDb = 0.0f, globalMidDb = 0.0f, globalHighDb = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalDynamicsStandaloneEditor)
 };
