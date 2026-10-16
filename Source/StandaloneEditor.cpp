@@ -18,7 +18,7 @@ void VocalDynamicsStandaloneEditor::TranscriptionWorker::run()
     args.add("-f"); args.add(audioFile.getFullPathName());
     args.add("-osrt");
     args.add("-of"); args.add(srtFile.withFileExtension("").getFullPathName());
-    args.add("-ml"); args.add("1");
+    // -ml limits segment length in characters; 1 fragments output and is not word alignment.
     args.add("-sow");
     args.add("-l"); args.add("auto");
     args.add("-np");
@@ -108,7 +108,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     title.setColour(juce::Label::textColourId, white);
     addAndMakeVisible(title);
 
-    status.setText("Import a vocal, select a time range, and create editable word regions.", juce::dontSendNotification);
+    status.setText("Import a vocal, set the offline Whisper engine/model, then detect words for gain editing.", juce::dontSendNotification);
     status.setFont(juce::Font(12.0f));
     status.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(status);
@@ -167,7 +167,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     playButton.onClick = [this] { togglePlayback(); };
     stopButton.onClick = [this] { stopPlayback(); };
     exportButton.onClick = [this] { exportProcessedAudio(); };
-    addWordButton.onClick = [this] { createWordEventFromSelection(); };
+    addWordButton.setButtonText("DETECT WORDS FIRST");
+    addWordButton.onClick = [this] { startTranscription(); };
     zoomInButton.setButtonText("+");
     zoomOutButton.setButtonText("-"); // ASCII hyphen avoids unsupported-glyph boxes on Windows.
     zoomInButton.setTooltip("Zoom in");
@@ -625,6 +626,9 @@ void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
     const auto area = waveformBounds();
     if (thumbnail.getTotalLength() > 0.0 && area.contains(event.getPosition()))
     {
+        // Follow the clicked position immediately. A drag scrubs the playhead;
+        // it must not create a fake word region.
+        seekFromMouse(event.x);
         isSelectingRange = true;
         mouseMovedOnWave = false;
         const auto drawable = area.reduced(12, 14);
@@ -656,8 +660,9 @@ void VocalDynamicsStandaloneEditor::mouseUp(const juce::MouseEvent& event)
     const auto drawable = waveformBounds().reduced(12, 14);
     selectionCurrentX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
     isSelectingRange = false;
-    if (mouseMovedOnWave && std::abs(selectionCurrentX - selectionStartX) >= 5)
-        createWordEventFromSelection();
+    // Word events must come from transcription, not arbitrary mouse-drawn regions.
+    if (mouseMovedOnWave)
+        seekFromMouse(selectionCurrentX);
     else
         seekFromMouse(event.x);
     repaint();
@@ -912,7 +917,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.drawRoundedRectangle(eventArea, 10.0f, 1.0f);
     g.setColour(purple);
     g.setFont(14.0f);
-    g.drawText("WORD / PHRASE REGIONS  •  DRAG ON WAVEFORM TO CREATE",
+    g.drawText("DETECTED WORDS  /  SELECT A WORD TO EDIT ITS GAIN",
                eventArea.getX() + 16.0f, eventArea.getY() + 8.0f, eventArea.getWidth() - 32.0f, 24.0f,
                juce::Justification::centredLeft);
 
@@ -920,7 +925,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     {
         g.setColour(muted);
         g.setFont(12.0f);
-        g.drawText("Select a section of the waveform. Each region can have its own gain and is applied during playback/export.",
+        g.drawText("No words detected yet. Set whisper-cli.exe and a multilingual model, then click TRANSCRIBE WORDS.",
                    eventArea.reduced(16.0f).withTrimmedTop(38.0f), juce::Justification::centredLeft);
     }
     else
