@@ -144,6 +144,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
     wordGainSlider.setRange(-24.0, 12.0, 0.1);
     wordGainSlider.setValue(0.0);
+    wordGainSlider.setEnabled(false);
+    wordGainSlider.setTooltip("Select a word/region first, then adjust its gain.");
     wordGainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     wordGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 20);
     wordGainSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
@@ -432,6 +434,7 @@ void VocalDynamicsStandaloneEditor::applyTranscriptionResult(bool success, const
 
     wordEvents = std::move(detected);
     selectedEvent = wordEvents.empty() ? -1 : 0;
+    wordGainSlider.setEnabled(selectedEvent >= 0);
     if (selectedEvent >= 0)
     {
         selectedWordLabel.setText(wordEvents[0].word, juce::dontSendNotification);
@@ -477,6 +480,7 @@ void VocalDynamicsStandaloneEditor::loadFile(const juce::File& file)
     selectedEvent = -1;
     selectedWordLabel.setText("No region selected", juce::dontSendNotification);
     wordGainSlider.setValue(0.0, juce::dontSendNotification);
+    wordGainSlider.setEnabled(false);
     thumbnail.clear();
     // Use an explicit change notification after setting the source so the first
     // waveform is drawn immediately rather than only after a later zoom repaint.
@@ -676,6 +680,7 @@ void VocalDynamicsStandaloneEditor::createWordEventFromSelection()
     wordEvents.push_back(event);
     selectedEvent = static_cast<int>(wordEvents.size()) - 1;
     selectedWordLabel.setText(event.word, juce::dontSendNotification);
+    wordGainSlider.setEnabled(true);
     wordGainSlider.setValue(0.0, juce::dontSendNotification);
     status.setText("Region created. Rename it by clicking its name; adjust its gain below.", juce::dontSendNotification);
     repaint();
@@ -699,6 +704,7 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
         if (point.x >= x1 && point.x <= x2)
         {
             selectedEvent = i;
+            wordGainSlider.setEnabled(true);
             selectedWordLabel.setText(e.word, juce::dontSendNotification);
             wordGainSlider.setValue(e.gainDb, juce::dontSendNotification);
             gainValueLabel.setText(juce::String(e.gainDb, 1) + " dB", juce::dontSendNotification);
@@ -715,7 +721,13 @@ void VocalDynamicsStandaloneEditor::updateSelectedGain()
     if (selectedEvent >= 0 && selectedEvent < static_cast<int>(wordEvents.size()))
     {
         wordEvents[static_cast<size_t>(selectedEvent)].gainDb = value;
+        status.setText("Gain for \"" + wordEvents[static_cast<size_t>(selectedEvent)].word
+                       + "\" set to " + juce::String(value, 1) + " dB.", juce::dontSendNotification);
         repaint();
+    }
+    else
+    {
+        status.setText("Select a word/region in the event lane before changing its gain.", juce::dontSendNotification);
     }
 }
 
