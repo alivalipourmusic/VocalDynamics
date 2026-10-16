@@ -127,7 +127,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     title.setColour(juce::Label::textColourId, white);
     addAndMakeVisible(title);
 
-    status.setText("Import a vocal, set the offline Whisper engine/model, then detect words for gain editing.", juce::dontSendNotification);
+    status.setText("Load a vocal, edit individual regions, or analyze tempo and key.", juce::dontSendNotification);
     status.setFont(juce::Font(12.0f));
     status.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(status);
@@ -354,7 +354,7 @@ void VocalDynamicsStandaloneEditor::chooseWhisperExecutable()
                 if (f.existsAsFile())
                 {
                     safeThis->whisperExecutable = f;
-                    safeThis->status.setText("Whisper executable set: " + f.getFileName(), juce::dontSendNotification);
+                    safeThis->status.setText("Speech app selected: " + f.getFileName(), juce::dontSendNotification);
                 }
             }
         });
@@ -373,7 +373,7 @@ void VocalDynamicsStandaloneEditor::chooseWhisperModel()
                 if (f.existsAsFile())
                 {
                     safeThis->whisperModel = f;
-                    safeThis->status.setText("Offline model set: " + f.getFileName(), juce::dontSendNotification);
+                    safeThis->status.setText("Language pack selected: " + f.getFileName(), juce::dontSendNotification);
                 }
             }
         });
@@ -402,7 +402,7 @@ void VocalDynamicsStandaloneEditor::startTranscription()
     const auto srt = temp.getChildFile(stem + ".srt");
     srt.deleteFile();
 
-    status.setText("Offline transcription running. Long vocals can take several minutes...", juce::dontSendNotification);
+    status.setText("Detecting words offline. Longer recordings may take a few minutes...", juce::dontSendNotification);
     transcribeButton.setEnabled(false);
 
     transcriptionWorker = std::make_unique<TranscriptionWorker>(
@@ -1191,7 +1191,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     {
         g.setColour(muted);
         g.setFont(11.0f);
-        g.drawText("No word events yet. Load audio, configure Whisper and run word detection.",
+        g.drawText("No words detected yet. Load audio, choose the speech app and language pack, then press Detect Words.",
                    lane.getX() + 14, lane.getY() + 42, lane.getWidth() - 28, 28, juce::Justification::centredLeft);
     }
     else
