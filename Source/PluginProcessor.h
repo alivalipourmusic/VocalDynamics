@@ -2,6 +2,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
 
 class VocalDynamicsAudioProcessor
     : public juce::AudioProcessor
@@ -45,6 +46,28 @@ public:
 
     using Parameters =
         juce::AudioProcessorValueTreeState;
+
+    struct MeterSnapshot
+    {
+        float inputLufs = -100.0f;
+        float outputLufs = -100.0f;
+        float truePeakDbtp = -100.0f;
+        float gainReductionDb = 0.0f;
+    };
+    MeterSnapshot getMeterSnapshot() const noexcept;
+
+    std::atomic<float> measuredInputLufs { -100.0f };
+    std::atomic<float> measuredOutputLufs { -100.0f };
+    std::atomic<float> measuredTruePeakDbtp { -100.0f };
+    std::atomic<float> measuredGainReductionDb { 0.0f };
+    double currentSampleRate = 44100.0;
+    float gainRiderDb = 0.0f;
+    float smoothedCompressorGain = 1.0f;
+    float deEsserEnvelope = 0.0f;
+    std::array<float, 2> previousSamples {{ 0.0f, 0.0f }};
+    double loudnessEnergySum = 0.0;
+    int64_t loudnessSamples = 0;
+
 
     Parameters parameters;
 
