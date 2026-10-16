@@ -144,8 +144,10 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
     wordGainSlider.setRange(-24.0, 12.0, 0.1);
     wordGainSlider.setValue(0.0);
-    wordGainSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    wordGainSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    wordGainSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    wordGainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 20);
+    wordGainSlider.setRotaryParameters(juce::MathConstants<float>::pi * 1.25f,
+                                       juce::MathConstants<float>::pi * 2.75f, true);
     wordGainSlider.setColour(juce::Slider::trackColourId, cyan);
     wordGainSlider.setColour(juce::Slider::thumbColourId, white);
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
@@ -475,14 +477,18 @@ juce::Rectangle<int> VocalDynamicsStandaloneEditor::waveformBounds() const
 
 double VocalDynamicsStandaloneEditor::timeAtX(int x) const
 {
-    const auto area = waveformBounds();
+    // The waveform is drawn inside a 12 px horizontal inset. Map clicks to
+    // that exact drawable area, not the outer rounded panel, otherwise seeks
+    // drift away from the point the user clicked.
+    const auto area = waveformBounds().reduced(12, 14);
     const double fullDuration = thumbnail.getTotalLength();
     if (fullDuration <= 0.0 || area.getWidth() <= 0)
         return 0.0;
     const double start = viewEndSeconds > viewStartSeconds ? viewStartSeconds : 0.0;
     const double end = viewEndSeconds > start ? viewEndSeconds : fullDuration;
-    return juce::jlimit(0.0, fullDuration,
-        start + static_cast<double>(x - area.getX()) / static_cast<double>(area.getWidth()) * (end - start));
+    const double ratio = juce::jlimit(0.0, 1.0,
+        static_cast<double>(x - area.getX()) / static_cast<double>(area.getWidth()));
+    return juce::jlimit(0.0, fullDuration, start + ratio * (end - start));
 }
 
 void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
@@ -553,7 +559,8 @@ void VocalDynamicsStandaloneEditor::mouseDown(const juce::MouseEvent& event)
     {
         isSelectingRange = true;
         mouseMovedOnWave = false;
-        selectionStartX = juce::jlimit(area.getX(), area.getRight(), event.x);
+        const auto drawable = area.reduced(12, 14);
+        selectionStartX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
         selectionCurrentX = selectionStartX;
         return;
     }
@@ -568,7 +575,8 @@ void VocalDynamicsStandaloneEditor::mouseDrag(const juce::MouseEvent& event)
     {
         if (std::abs(event.x - selectionStartX) > 3)
             mouseMovedOnWave = true;
-        selectionCurrentX = juce::jlimit(waveformBounds().getX(), waveformBounds().getRight(), event.x);
+        const auto drawable = waveformBounds().reduced(12, 14);
+        selectionCurrentX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
         repaint();
     }
 }
@@ -577,7 +585,8 @@ void VocalDynamicsStandaloneEditor::mouseUp(const juce::MouseEvent& event)
 {
     if (!isSelectingRange)
         return;
-    selectionCurrentX = juce::jlimit(waveformBounds().getX(), waveformBounds().getRight(), event.x);
+    const auto drawable = waveformBounds().reduced(12, 14);
+    selectionCurrentX = juce::jlimit(drawable.getX(), drawable.getRight(), event.x);
     isSelectingRange = false;
     if (mouseMovedOnWave && std::abs(selectionCurrentX - selectionStartX) >= 5)
         createWordEventFromSelection();
@@ -805,8 +814,9 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         {
             const double visibleStart = viewStartSeconds;
             const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
-            const auto x = waveArea.getX() + static_cast<int>(
-                ((transport.getCurrentPosition() - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * waveArea.getWidth());
+            const auto drawable = waveArea.reduced(12, 14);
+            const auto x = drawable.getX() + static_cast<int>(
+                ((transport.getCurrentPosition() - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * drawable.getWidth());
             g.setColour(white);
             g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 8), static_cast<float>(waveArea.getBottom() - 8));
         }
@@ -884,7 +894,7 @@ void VocalDynamicsStandaloneEditor::resized()
     exportButton.setBounds(width - 530, 112, 125, 30);
 
     selectedWordLabel.setBounds(44, 548, 180, 28);
-    wordGainSlider.setBounds(235, 550, width - 405, 24);
+    wordGainSlider.setBounds(width - 270, 510, 150, 105);
     gainValueLabel.setBounds(width - 155, 548, 95, 28);
     addWordButton.setBounds(44, 584, 150, 30);
     whisperExeButton.setBounds(210, 584, 130, 30);
