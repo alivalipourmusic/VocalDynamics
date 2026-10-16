@@ -1262,7 +1262,7 @@ void VocalDynamicsStandaloneEditor::audioDeviceIOCallbackWithContext(
     if (channel >= numInputChannels)
         return;
     const float* channels[] = { inputChannelData[channel] };
-    recordingWriter->write(channels, 1, numSamples);
+    recordingWriter->write(channels, numSamples);
 }
 
 void VocalDynamicsStandaloneEditor::toggleRecording()
