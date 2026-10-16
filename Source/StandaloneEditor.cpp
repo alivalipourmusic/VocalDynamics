@@ -119,8 +119,8 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     eventGainSource.setEvents(&wordEvents);
 
     const auto white = juce::Colour(0xffedf7ff);
-    const auto cyan = juce::Colour(0xff39d9e9);
-    const auto muted = juce::Colour(0xff8da6b9);
+    const auto cyan = juce::Colour(0xff54f2c2);
+    const auto muted = juce::Colour(0xff91a3bd);
 
     title.setText("VOCAL DYNAMICS", juce::dontSendNotification);
     title.setFont(juce::Font(27.0f, juce::Font::bold));
@@ -177,13 +177,24 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
 
     for (auto* button : { &importButton, &settingsButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
     {
-        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff164252));
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1a2940));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff245e5a));
         button->setColour(juce::TextButton::textColourOffId, white);
+        button->setColour(juce::TextButton::textColourOnId, white);
+        button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff18263b));
+        button->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff1c625a));
+        button->setColour(juce::TextButton::textColourOffId, white);
+        button->setColour(juce::TextButton::textColourOnId, white);
+        button->setLookAndFeel(nullptr);
         addAndMakeVisible(*button);
     }
+    importButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1b665b));
+    transcribeButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff6d4ed8));
+    exportButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff253751));
+    playButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff174e48));
 
     importButton.onClick = [this] { chooseFile(); };
-    analysisButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff263b52));
+    analysisButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff6d4ed8));
     analysisButton.setColour(juce::TextButton::textColourOffId, white);
     analysisButton.onClick = [this] { analyzeTempoAndKey(); };
     analysisButton.setTooltip("Estimate tempo (BPM) and musical key from the loaded audio.");
@@ -1055,31 +1066,36 @@ void VocalDynamicsStandaloneEditor::changeListenerCallback(juce::ChangeBroadcast
 
 void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
 {
-    const auto bg = juce::Colour(0xff080b10);
-    const auto surface = juce::Colour(0xff101720);
-    const auto raised = juce::Colour(0xff151f2b);
-    const auto edge = juce::Colour(0xff293747);
-    const auto cyan = juce::Colour(0xff51e0d0);
-    const auto violet = juce::Colour(0xffa68bff);
-    const auto text = juce::Colour(0xffedf4fb);
-    const auto muted = juce::Colour(0xff8193a7);
+    const auto bg = juce::Colour(0xff070b14);
+    const auto surface = juce::Colour(0xff101827);
+    const auto raised = juce::Colour(0xff182338);
+    const auto edge = juce::Colour(0xff26374f);
+    const auto cyan = juce::Colour(0xff54f2c2);
+    const auto violet = juce::Colour(0xffa78bfa);
+    const auto text = juce::Colour(0xfff3f6ff);
+    const auto muted = juce::Colour(0xff91a3bd);
     const auto main = waveformBounds();
 
     g.fillAll(bg);
     // A purpose-built editorial layout: narrow utility rail, large waveform canvas,
     // event strip and a contextual inspector. Avoid the generic rounded-card look.
-    g.setColour(juce::Colour(0xff0d131b));
+    g.setColour(juce::Colour(0xff0b1220));
     g.fillRect(0, 0, getWidth(), 112);
+    g.setColour(juce::Colour(0xff111e31));
+    g.fillRect(0, 108, getWidth(), 4);
     g.setColour(cyan);
     g.fillRect(0, 0, 4, 112);
+    g.setColour(juce::Colour(0x3354f2c2));
+    g.fillRect(4, 0, 18, 112);
     g.setColour(text);
-    g.setFont(juce::Font(21.0f, juce::Font::bold));
-    g.drawText("VOCAL", 28, 17, 92, 26, juce::Justification::centredLeft);
+    g.setFont(juce::Font("Aptos Display", 24.0f, juce::Font::bold));
+    g.drawText("VOCAL", 28, 14, 104, 29, juce::Justification::centredLeft);
     g.setColour(cyan);
-    g.drawText("DYNAMICS", 28, 41, 118, 23, juce::Justification::centredLeft);
+    g.setFont(juce::Font("Aptos Display", 20.0f, juce::Font::bold));
+    g.drawText("DYNAMICS", 28, 43, 140, 24, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.5f);
-    g.drawText("EVENT-BASED VOCAL WORKSTATION", 28, 72, 240, 16, juce::Justification::centredLeft);
+    g.drawText("VOCAL CONTROL  /  STUDIO SUITE", 28, 75, 260, 16, juce::Justification::centredLeft);
 
     g.setColour(edge);
     g.drawHorizontalLine(111, 0.0f, static_cast<float>(getWidth()));
@@ -1115,7 +1131,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         for (int i = 0; i <= 8; ++i)
         {
             const int x = drawable.getX() + i * drawable.getWidth() / 8;
-            g.setColour(juce::Colour(0xff1d2a37));
+            g.setColour(juce::Colour(0xff243149));
             g.drawVerticalLine(x, static_cast<float>(drawable.getY()), static_cast<float>(drawable.getBottom()));
             const double t = visibleStart + span * static_cast<double>(i) / 8.0;
             g.setColour(muted);
@@ -1123,7 +1139,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             g.drawText(formatTimelineTime(t), x - 36, main.getY() + 24, 72, 13, juce::Justification::centred);
         }
 
-        g.setColour(cyan.withAlpha(0.90f));
+        g.setColour(cyan.withAlpha(0.96f));
         thumbnail.drawChannels(g, drawable, visibleStart, visibleEnd, 1.0f);
 
         // A center reference line improves visual reading of low-level consonants.
@@ -1144,6 +1160,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         {
             const double playheadTime = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
             const int x = drawable.getX() + static_cast<int>((playheadTime - visibleStart) / span * drawable.getWidth());
+            g.setColour(juce::Colour(0xfff6fcff));
             g.setColour(juce::Colour(0xfff6fcff));
             g.drawVerticalLine(x, static_cast<float>(drawable.getY() - 2), static_cast<float>(drawable.getBottom()));
             g.setColour(cyan);
@@ -1272,7 +1289,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                analysis.getWidth() - 190, 25, juce::Justification::centredLeft);
 
     // Bottom status strip, deliberately quiet.
-    g.setColour(juce::Colour(0xff0d131b));
+    g.setColour(juce::Colour(0xff0b1220));
     g.fillRect(0, getHeight() - 34, getWidth(), 34);
     g.setColour(edge);
     g.drawHorizontalLine(getHeight() - 34, 0.0f, static_cast<float>(getWidth()));
