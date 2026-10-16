@@ -65,6 +65,8 @@ public:
     float smoothedCompressorGain = 1.0f;
     float deEsserEnvelope = 0.0f;
     std::array<float, 2> previousSamples {{ 0.0f, 0.0f }};
+    std::array<float, 2> previousDeEssSamples {{ 0.0f, 0.0f }};
+    float detectorEnvelope = 0.0f;
     double loudnessEnergySum = 0.0;
     int64_t loudnessSamples = 0;
 
