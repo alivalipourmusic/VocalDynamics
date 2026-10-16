@@ -99,15 +99,30 @@ void VocalDynamicsStandaloneEditor::EventGainSource::getNextAudioBlock(const juc
     {
         const double time = blockStart + static_cast<double>(sample) / currentSampleRate;
         float gain = 1.0f;
+        float lowDb = lowGlobal != nullptr ? *lowGlobal : 0.0f;
+        float midDb = midGlobal != nullptr ? *midGlobal : 0.0f;
+        float highDb = highGlobal != nullptr ? *highGlobal : 0.0f;
         for (const auto& event : *events)
         {
             if (time >= event.startSeconds && time < event.endSeconds)
+            {
                 gain = juce::Decibels::decibelsToGain(event.gainDb);
+                lowDb = event.lowDb; midDb = event.midDb; highDb = event.highDb;
+            }
         }
-
-        if (gain != 1.0f)
-            for (int channel = 0; channel < info.buffer->getNumChannels(); ++channel)
-                info.buffer->getWritePointer(channel, info.startSample)[sample] *= gain;
+        for (int channel = 0; channel < juce::jmin(2, info.buffer->getNumChannels()); ++channel)
+        {
+            auto* data = info.buffer->getWritePointer(channel, info.startSample);
+            const float input = data[sample];
+            lowState[channel] += 0.055f * (input - lowState[channel]);
+            midState[channel] += 0.22f * (input - midState[channel]);
+            const float low = lowState[channel];
+            const float mid = midState[channel] - lowState[channel];
+            const float high = input - midState[channel];
+            data[sample] = (low * juce::Decibels::decibelsToGain(lowDb)
+                          + mid * juce::Decibels::decibelsToGain(midDb)
+                          + high * juce::Decibels::decibelsToGain(highDb)) * gain;
+        }
     }
 }
 
