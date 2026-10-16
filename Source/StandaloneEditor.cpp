@@ -802,6 +802,149 @@ void VocalDynamicsStandaloneEditor::updateSelectedGain()
     }
 }
 
+void VocalDynamicsStandaloneEditor::analyzeTempoAndKey()
+{
+    if (!currentFile.existsAsFile())
+    {
+        status.setText("Load an audio file before running music analysis.", juce::dontSendNotification);
+        return;
+    }
+
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(currentFile));
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
+    {
+        status.setText("Could not read this audio file for analysis.", juce::dontSendNotification);
+        return;
+    }
+
+    // Analyze up to 45 seconds, mono, then downsample for fast offline estimation.
+    const auto maxSamples = static_cast<juce::int64>(reader->sampleRate * 45.0);
+    const int sourceCount = static_cast<int>(juce::jmin<juce::int64>(reader->lengthInSamples, maxSamples));
+    juce::AudioBuffer<float> source(1, sourceCount);
+    float* channels[] = { source.getWritePointer(0) };
+    if (!reader->read(channels, 1, 0, 0, sourceCount, true, false))
+    {
+        status.setText("Could not read audio samples for analysis.", juce::dontSendNotification);
+        return;
+    }
+
+    const int stride = juce::jmax(1, static_cast<int>(std::floor(reader->sampleRate / 11025.0)));
+    const double analysisRate = reader->sampleRate / static_cast<double>(stride);
+    std::vector<float> mono;
+    mono.reserve(static_cast<size_t>(sourceCount / stride + 1));
+    const auto* input = source.getReadPointer(0);
+    for (int i = 0; i < sourceCount; i += stride)
+        mono.push_back(input[i]);
+
+    if (mono.size() < 8192)
+    {
+        status.setText("Audio is too short for reliable BPM and key estimation.", juce::dontSendNotification);
+        return;
+    }
+
+    // Tempo: frame RMS envelope followed by autocorrelation in the 60–180 BPM range.
+    constexpr int envelopeHop = 256;
+    std::vector<float> envelope;
+    for (size_t start = 0; start + envelopeHop <= mono.size(); start += envelopeHop)
+    {
+        double energy = 0.0;
+        for (int i = 0; i < envelopeHop; ++i)
+        {
+            const double v = mono[start + static_cast<size_t>(i)];
+            energy += v * v;
+        }
+        envelope.push_back(static_cast<float>(std::sqrt(energy / envelopeHop)));
+    }
+    std::vector<float> onset(envelope.size(), 0.0f);
+    for (size_t i = 1; i < envelope.size(); ++i)
+        onset[i] = juce::jmax(0.0f, envelope[i] - envelope[i - 1]);
+
+    double bestCorrelation = -1.0;
+    int bestLag = 0;
+    const int minLag = juce::jmax(1, static_cast<int>(analysisRate * 60.0 / (180.0 * envelopeHop)));
+    const int maxLag = juce::jmax(minLag + 1, static_cast<int>(analysisRate * 60.0 / (60.0 * envelopeHop)));
+    for (int lag = minLag; lag <= maxLag && lag < static_cast<int>(onset.size() / 2); ++lag)
+    {
+        double corr = 0.0;
+        for (size_t i = static_cast<size_t>(lag); i < onset.size(); ++i)
+            corr += static_cast<double>(onset[i]) * onset[i - static_cast<size_t>(lag)];
+        if (corr > bestCorrelation)
+        {
+            bestCorrelation = corr;
+            bestLag = lag;
+        }
+    }
+    double bpm = bestLag > 0 ? 60.0 * analysisRate / (bestLag * envelopeHop) : 0.0;
+    if (bpm > 0.0)
+    {
+        while (bpm < 70.0) bpm *= 2.0;
+        while (bpm > 160.0) bpm *= 0.5;
+    }
+
+    // Key estimate: aggregate spectral energy into pitch classes and compare
+    // against standard major/minor tonal profiles. Treat the result as a guide.
+    constexpr int fftOrder = 13;
+    constexpr int fftSize = 1 << fftOrder;
+    juce::dsp::FFT fft(fftOrder);
+    juce::dsp::WindowingFunction<float> window(fftSize, juce::dsp::WindowingFunction<float>::hann, false);
+    std::array<double, 12> chroma {};
+    std::vector<float> fftData(static_cast<size_t>(fftSize * 2), 0.0f);
+    int frameCount = 0;
+    const size_t hop = fftSize / 2;
+    for (size_t start = 0; start + fftSize <= mono.size(); start += hop)
+    {
+        std::fill(fftData.begin(), fftData.end(), 0.0f);
+        for (int i = 0; i < fftSize; ++i)
+            fftData[static_cast<size_t>(i)] = mono[start + static_cast<size_t>(i)];
+        window.multiplyWithWindowingTable(fftData.data(), fftSize);
+        fft.performFrequencyOnlyForwardTransform(fftData.data());
+        for (int bin = 2; bin < fftSize / 2; ++bin)
+        {
+            const double frequency = static_cast<double>(bin) * analysisRate / fftSize;
+            if (frequency < 55.0 || frequency > 1500.0) continue;
+            const int midi = static_cast<int>(std::round(69.0 + 12.0 * std::log2(frequency / 440.0)));
+            const int pitchClass = (midi % 12 + 12) % 12;
+            chroma[static_cast<size_t>(pitchClass)] += fftData[static_cast<size_t>(bin)];
+        }
+        ++frameCount;
+    }
+
+    static const char* noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    const double majorProfile[12] = { 6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88 };
+    const double minorProfile[12] = { 6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17 };
+    double mean = 0.0;
+    for (double value : chroma) mean += value;
+    mean /= 12.0;
+    double bestKeyScore = -1.0e30;
+    int bestRoot = 0;
+    bool bestMinor = false;
+    for (int root = 0; root < 12; ++root)
+    {
+        for (int mode = 0; mode < 2; ++mode)
+        {
+            double score = 0.0;
+            for (int i = 0; i < 12; ++i)
+            {
+                const double profile = mode == 0 ? majorProfile[i] : minorProfile[i];
+                score += (chroma[static_cast<size_t>((root + i) % 12)] - mean) * profile;
+            }
+            if (score > bestKeyScore)
+            {
+                bestKeyScore = score;
+                bestRoot = root;
+                bestMinor = mode == 1;
+            }
+        }
+    }
+
+    const auto bpmText = bpm > 0.0 ? juce::String(static_cast<int>(std::round(bpm))) : juce::String("--");
+    const auto keyText = frameCount > 0 ? juce::String(noteNames[bestRoot]) + (bestMinor ? " minor" : " major")
+                                         : juce::String("unclear");
+    analysisLabel.setText("TEMPO  " + bpmText + " BPM     KEY  " + keyText + "  (estimate)", juce::dontSendNotification);
+    status.setText("Analysis complete. BPM and key are estimates; confirm by ear before using them.", juce::dontSendNotification);
+    repaint();
+}
+
 void VocalDynamicsStandaloneEditor::exportProcessedAudio()
 {
     if (!currentFile.existsAsFile())
