@@ -117,7 +117,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     thumbnail.addChangeListener(this);
     readAheadThread.startThread();
     recordingThread.startThread();
-    eventGainSource.setEvents(&wordEvents);
+    eventGainSource.setEvents(&wordEvents, &globalLowDb, &globalMidDb, &globalHighDb);
 
     const auto white = juce::Colour(0xffedf7ff);
     const auto cyan = juce::Colour(0xff54f2c2);
@@ -175,6 +175,31 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     wordGainSlider.setColour(juce::Slider::thumbColourId, white);
     wordGainSlider.onValueChange = [this] { updateSelectedGain(); };
     addAndMakeVisible(wordGainSlider);
+
+    const auto eqCyan = juce::Colour(0xff54f2c2);
+    const auto eqWhite = juce::Colour(0xffedf7ff);
+    eqTitle.setText("3-BAND EQ", juce::dontSendNotification);
+    eqTitle.setColour(juce::Label::textColourId, eqCyan);
+    eqTitle.setFont(juce::Font(14.0f, juce::Font::bold));
+    addAndMakeVisible(eqTitle);
+    auto setupEqSlider = [this, eqCyan, eqWhite](juce::Slider& slider, juce::Label& label, const juce::String& name)
+    {
+        label.setText(name, juce::dontSendNotification);
+        label.setColour(juce::Label::textColourId, eqWhite);
+        label.setJustificationType(juce::Justification::centred);
+        addAndMakeVisible(label);
+        slider.setSliderStyle(juce::Slider::LinearHorizontal);
+        slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 48, 18);
+        slider.setRange(-12.0, 12.0, 0.1);
+        slider.setValue(0.0);
+        slider.setColour(juce::Slider::trackColourId, eqCyan);
+        slider.setColour(juce::Slider::thumbColourId, eqWhite);
+        slider.onValueChange = [this] { updateSelectedEQ(); };
+        addAndMakeVisible(slider);
+    };
+    setupEqSlider(lowEqSlider, lowEqLabel, "LOW");
+    setupEqSlider(midEqSlider, midEqLabel, "MID");
+    setupEqSlider(highEqSlider, highEqLabel, "HIGH");
 
     for (auto* button : { &importButton, &recordButton, &settingsButton, &playButton, &stopButton, &exportButton, &addWordButton, &zoomInButton, &zoomOutButton, &whisperExeButton, &whisperModelButton, &transcribeButton })
     {
@@ -827,6 +852,9 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
             wordGainSlider.setEnabled(true);
             selectedWordLabel.setText(e.word, juce::dontSendNotification);
             wordGainSlider.setValue(e.gainDb, juce::dontSendNotification);
+            lowEqSlider.setValue(e.lowDb, juce::dontSendNotification);
+            midEqSlider.setValue(e.midDb, juce::dontSendNotification);
+            highEqSlider.setValue(e.highDb, juce::dontSendNotification);
             gainValueLabel.setText(juce::String(e.gainDb, 1) + " dB", juce::dontSendNotification);
             // Selecting a detected word also places the playhead at its exact start time.
             if (readerSource != nullptr)
@@ -835,6 +863,25 @@ void VocalDynamicsStandaloneEditor::selectEventAt(juce::Point<int> point)
             return;
         }
     }
+}
+
+void VocalDynamicsStandaloneEditor::updateSelectedEQ()
+{
+    const float low = static_cast<float>(lowEqSlider.getValue());
+    const float mid = static_cast<float>(midEqSlider.getValue());
+    const float high = static_cast<float>(highEqSlider.getValue());
+    if (selectedEvent >= 0 && selectedEvent < static_cast<int>(wordEvents.size()))
+    {
+        auto& event = wordEvents[static_cast<size_t>(selectedEvent)];
+        event.lowDb = low; event.midDb = mid; event.highDb = high;
+        status.setText("EQ set for selected region.", juce::dontSendNotification);
+    }
+    else
+    {
+        globalLowDb = low; globalMidDb = mid; globalHighDb = high;
+        status.setText("Global vocal EQ updated. Select a region for separate EQ.", juce::dontSendNotification);
+    }
+    repaint();
 }
 
 void VocalDynamicsStandaloneEditor::updateSelectedGain()
