@@ -542,7 +542,9 @@ double VocalDynamicsStandaloneEditor::timeAtX(int x) const
     // that exact drawable area, not the outer rounded panel, otherwise seeks
     // drift away from the point the user clicked.
     const auto area = waveformBounds().reduced(12, 14);
-    const double fullDuration = thumbnail.getTotalLength();
+    // Playback transport is the authoritative timeline clock; do not mix it
+    // with the asynchronously generated thumbnail duration for mouse seeking.
+    const double fullDuration = transport.getLengthInSeconds();
     if (fullDuration <= 0.0 || area.getWidth() <= 0)
         return 0.0;
     const double start = viewEndSeconds > viewStartSeconds ? viewStartSeconds : 0.0;
@@ -554,9 +556,14 @@ double VocalDynamicsStandaloneEditor::timeAtX(int x) const
 
 void VocalDynamicsStandaloneEditor::seekFromMouse(int x)
 {
-    if (thumbnail.getTotalLength() <= 0.0 || readerSource == nullptr)
+    if (transport.getLengthInSeconds() <= 0.0 || readerSource == nullptr)
         return;
-    transport.setPosition(timeAtX(x));
+    const double target = timeAtX(x);
+    transport.setPosition(target);
+    timeLabel.setText(juce::String(target, 3) + " s / "
+                      + juce::String(transport.getLengthInSeconds(), 3) + " s",
+                      juce::dontSendNotification);
+    repaint();
     if (!transport.isPlaying())
         playButton.setButtonText("PLAY / SPACE");
 }
@@ -900,8 +907,9 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             const double visibleStart = viewStartSeconds;
             const double visibleEnd = viewEndSeconds > visibleStart ? viewEndSeconds : duration;
             const auto drawable = waveArea.reduced(12, 14);
+            const double cursorTime = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
             const auto rawX = drawable.getX() + static_cast<int>(
-                ((transport.getCurrentPosition() - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * drawable.getWidth());
+                ((cursorTime - visibleStart) / juce::jmax(0.001, visibleEnd - visibleStart)) * drawable.getWidth());
             const auto x = juce::jlimit(drawable.getX(), drawable.getRight(), rawX);
             g.setColour(white);
             g.drawVerticalLine(x, static_cast<float>(waveArea.getY() + 8), static_cast<float>(waveArea.getBottom() - 8));
