@@ -1,10 +1,11 @@
-
-name: Build Vocal Dynamics VST3
+name: Build Vocal Dynamics
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - rebuild/standalone-editor-stage-1
 
 jobs:
   build:
@@ -17,12 +18,22 @@ jobs:
       - name: Configure project
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build VST3
+      - name: Build VST3 plugin
         run: cmake --build build --config Release --target VocalDynamics_VST3
+
+      - name: Build standalone desktop editor
+        run: cmake --build build --config Release --target VocalDynamicsEditor
 
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
           name: VocalDynamics-VST3
           path: build/VocalDynamics_artefacts/Release/VST3/
+          if-no-files-found: error
+
+      - name: Upload standalone editor
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalDynamics-Desktop-Editor
+          path: build/VocalDynamicsEditor_artefacts/Release/
           if-no-files-found: error
