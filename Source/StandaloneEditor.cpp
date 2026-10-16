@@ -1217,35 +1217,64 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         }
     }
 
-    // Right-side inspector follows the selected event; controls remain functional.
+    // Inspector with aligned labels and controls; no text is drawn beneath another control.
     const int sideX = main.getRight() + 14;
-    const int sideW = juce::jmax(220, getWidth() - sideX - 28);
-    juce::Rectangle<int> inspector(sideX, 145, sideW, 500);
+    const int sideW = juce::jmax(220, getWidth() - sideX - 24);
+    juce::Rectangle<int> inspector(sideX, 142, sideW, 426);
     g.setColour(surface);
     g.fillRoundedRectangle(inspector.toFloat(), 5.0f);
     g.setColour(edge);
     g.drawRoundedRectangle(inspector.toFloat(), 5.0f, 1.0f);
     g.setColour(cyan);
-    g.fillRect(inspector.getX(), inspector.getY(), 3, 42);
-    g.setColour(muted);
-    g.setFont(10.0f);
-    g.drawText("INSPECTOR  /  ACTIVE REGION", inspector.getX() + 15, inspector.getY() + 13,
-               inspector.getWidth() - 28, 16, juce::Justification::centredLeft);
+    g.fillRect(inspector.getX(), inspector.getY(), 3, 36);
+    g.setColour(text);
+    g.setFont(juce::Font(13.0f, juce::Font::bold));
+    g.drawText("REGION INSPECTOR", inspector.getX() + 14, inspector.getY() + 8,
+               inspector.getWidth() - 26, 20, juce::Justification::centredLeft);
     g.setColour(edge);
-    g.drawHorizontalLine(inspector.getY() + 44, static_cast<float>(inspector.getX() + 14),
-                         static_cast<float>(inspector.getRight() - 14));
+    g.drawHorizontalLine(inspector.getY() + 40, static_cast<float>(inspector.getX() + 12),
+                         static_cast<float>(inspector.getRight() - 12));
     g.setColour(muted);
-    g.setFont(10.0f);
-    g.drawText("EVENT GAIN", inspector.getX() + 16, inspector.getY() + 205,
-               inspector.getWidth() - 32, 16, juce::Justification::centredLeft);
+    g.setFont(10.5f);
+    g.drawText("SELECTED WORD / REGION", inspector.getX() + 14, inspector.getY() + 49,
+               inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
+    g.drawText("GAIN", inspector.getX() + 14, inspector.getY() + 153,
+               inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
     g.setColour(cyan);
-    g.setFont(juce::Font(22.0f, juce::Font::bold));
-    g.drawText(gainValueLabel.getText(), inspector.getX() + 16, inspector.getY() + 222,
-               inspector.getWidth() - 32, 28, juce::Justification::centredLeft);
+    g.setFont(juce::Font(20.0f, juce::Font::bold));
+    g.drawText(gainValueLabel.getText(), inspector.getX() + 14, inspector.getY() + 169,
+               inspector.getWidth() - 26, 28, juce::Justification::centredLeft);
+    g.setColour(edge);
+    g.drawHorizontalLine(inspector.getY() + 252, static_cast<float>(inspector.getX() + 12),
+                         static_cast<float>(inspector.getRight() - 12));
+    g.setColour(text);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.drawText("WORD DETECTION", inspector.getX() + 14, inspector.getY() + 264,
+               inspector.getWidth() - 26, 18, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.0f);
-    g.drawText("Affects playback + WAV export", inspector.getX() + 16, inspector.getBottom() - 28,
-               inspector.getWidth() - 32, 15, juce::Justification::centredLeft);
+    g.drawText("Optional: set up offline speech recognition once,",
+               inspector.getX() + 14, inspector.getY() + 285, inspector.getWidth() - 24, 14,
+               juce::Justification::centredLeft);
+    g.drawText("then use Detect Words to create timed regions.",
+               inspector.getX() + 14, inspector.getY() + 300, inspector.getWidth() - 24, 14,
+               juce::Justification::centredLeft);
+
+    juce::Rectangle<int> analysis(main.getX(), 584, main.getWidth(), 76);
+    g.setColour(surface);
+    g.fillRoundedRectangle(analysis.toFloat(), 5.0f);
+    g.setColour(edge);
+    g.drawRoundedRectangle(analysis.toFloat(), 5.0f, 1.0f);
+    g.setColour(violet);
+    g.fillRect(analysis.getX(), analysis.getY(), 3, analysis.getHeight());
+    g.setColour(muted);
+    g.setFont(10.0f);
+    g.drawText("MUSIC ANALYSIS", analysis.getX() + 14, analysis.getY() + 9, 130, 15,
+               juce::Justification::centredLeft);
+    g.setColour(text);
+    g.setFont(juce::Font(15.0f, juce::Font::bold));
+    g.drawText(analysisLabel.getText(), analysis.getX() + 14, analysis.getY() + 29,
+               analysis.getWidth() - 190, 25, juce::Justification::centredLeft);
 
     // Bottom status strip, deliberately quiet.
     g.setColour(juce::Colour(0xff0d131b));
@@ -1263,31 +1292,34 @@ void VocalDynamicsStandaloneEditor::resized()
 {
     const int width = getWidth();
     const int height = getHeight();
-    const int sideX = juce::jmax(600, width - 330);
-    title.setBounds(28, 14, 170, 58);
+    const int inspectorX = waveformBounds().getRight() + 28;
+    const int inspectorW = juce::jmax(210, width - inspectorX - 24);
+
     title.setVisible(false);
     status.setVisible(false);
     timeLabel.setVisible(false);
-    status.setBounds(32, height - 32, width - 48, 24);
-    timeLabel.setBounds(285, 34, 230, 27);
+    status.setBounds(32, height - 28, width - 48, 20);
+    timeLabel.setBounds(270, 34, 220, 28);
 
-    importButton.setBounds(width - 420, 34, 118, 38);
-    playButton.setBounds(width - 294, 34, 86, 38);
-    stopButton.setBounds(width - 200, 34, 62, 38);
-    zoomOutButton.setBounds(width - 128, 34, 30, 38);
-    zoomLabel.setBounds(width - 95, 34, 54, 38);
-    zoomInButton.setBounds(width - 38, 34, 30, 38);
+    importButton.setBounds(width - 422, 34, 116, 36);
+    playButton.setBounds(width - 300, 34, 82, 36);
+    stopButton.setBounds(width - 212, 34, 58, 36);
+    zoomOutButton.setBounds(width - 146, 34, 30, 36);
+    zoomLabel.setBounds(width - 112, 34, 48, 36);
+    zoomInButton.setBounds(width - 58, 34, 30, 36);
 
-    // Inspector is a compact vertical tool rack rather than a row of crowded buttons.
-    const int inspectorX = sideX + 16;
-    const int inspectorW = juce::jmax(180, width - inspectorX - 28);
-    selectedWordLabel.setBounds(inspectorX, 205, inspectorW, 34);
-    wordGainSlider.setBounds(inspectorX + 4, 414, inspectorW - 8, 104);
-    gainValueLabel.setBounds(inspectorX, 382, inspectorW, 28);
-    settingsButton.setBounds(inspectorX, 160, inspectorW, 30);
-    exportButton.setBounds(inspectorX, 248, inspectorW, 30);
-    whisperExeButton.setBounds(inspectorX, 286, inspectorW, 28);
-    whisperModelButton.setBounds(inspectorX, 318, inspectorW, 28);
-    transcribeButton.setBounds(inspectorX, 354, inspectorW, 30);
-    addWordButton.setBounds(inspectorX, 526, inspectorW, 26);
+    selectedWordLabel.setBounds(inspectorX + 12, 202, inspectorW - 24, 32);
+    gainValueLabel.setBounds(inspectorX + 12, 310, inspectorW - 24, 26);
+    wordGainSlider.setBounds(inspectorX + 12, 336, inspectorW - 24, 68);
+    settingsButton.setButtonText("AUDIO DEVICE SETTINGS");
+    settingsButton.setBounds(inspectorX + 12, 410, inspectorW - 24, 28);
+    exportButton.setBounds(inspectorX + 12, 444, inspectorW - 24, 28);
+    whisperExeButton.setBounds(inspectorX + 12, 486, inspectorW - 24, 25);
+    whisperModelButton.setBounds(inspectorX + 12, 516, inspectorW - 24, 25);
+    transcribeButton.setBounds(inspectorX + 12, 546, inspectorW - 24, 28);
+    addWordButton.setVisible(false);
+
+    analysisLabel.setBounds(waveformBounds().getX() + 14, 612,
+                            waveformBounds().getWidth() - 210, 24);
+    analysisButton.setBounds(waveformBounds().getRight() - 180, 598, 164, 48);
 }
