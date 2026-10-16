@@ -982,13 +982,13 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             g.setColour(juce::Colour(0x3351e0d0));
             g.fillRect(x, drawable.getY(), w, drawable.getHeight());
             g.setColour(cyan);
-            g.drawRect(x, drawable.getY(), w, drawable.getHeight(), 1.0f);
+            g.drawRect(static_cast<float>(x), static_cast<float>(drawable.getY()), static_cast<float>(w), static_cast<float>(drawable.getHeight()), 1.0f);
         }
 
         if (duration > 0.0)
         {
-            const double cursor = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
-            const int x = drawable.getX() + static_cast<int>((cursor - visibleStart) / span * drawable.getWidth());
+            const double playheadTime = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
+            const int x = drawable.getX() + static_cast<int>((playheadTime - visibleStart) / span * drawable.getWidth());
             g.setColour(juce::Colour(0xfff6fcff));
             g.drawVerticalLine(x, static_cast<float>(drawable.getY() - 2), static_cast<float>(drawable.getBottom()));
             g.setColour(cyan);
