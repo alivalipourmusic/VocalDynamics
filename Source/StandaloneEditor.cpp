@@ -209,6 +209,10 @@ VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
 
 bool VocalDynamicsStandaloneEditor::isInterestedInFileDrag(const juce::StringArray& files)
 {
+    if (files.isEmpty())
+        return false;
+
+    // Accept only real audio files supported by the registered JUCE formats.
     for (const auto& path : files)
     {
         const juce::File file(path);
@@ -218,11 +222,27 @@ bool VocalDynamicsStandaloneEditor::isInterestedInFileDrag(const juce::StringArr
     return false;
 }
 
+void VocalDynamicsStandaloneEditor::fileDragEnter(const juce::StringArray&, int, int)
+{
+    isDraggingFile = true;
+    repaint();
+}
+
+void VocalDynamicsStandaloneEditor::fileDragExit(const juce::StringArray&)
+{
+    isDraggingFile = false;
+    repaint();
+}
+
 void VocalDynamicsStandaloneEditor::filesDropped(const juce::StringArray& files, int, int)
 {
     isDraggingFile = false;
     if (!files.isEmpty())
-        loadFile(juce::File(files[0]));
+    {
+        const juce::File file(files[0]);
+        if (file.existsAsFile())
+            loadFile(file);
+    }
     repaint();
 }
 
@@ -919,7 +939,20 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     {
         g.setColour(muted);
         g.setFont(15.0f);
-        g.drawText("IMPORT A VOCAL FILE TO VIEW ITS WAVEFORM", waveArea.reduced(20, 20), juce::Justification::centred);
+        g.drawText("DRAG & DROP AN AUDIO FILE HERE  •  OR CLICK IMPORT VOCAL",
+                   waveArea.reduced(20, 20), juce::Justification::centred);
+    }
+
+    if (isDraggingFile)
+    {
+        g.setColour(juce::Colour(0x9939d9e9));
+        g.fillRoundedRectangle(waveArea.toFloat().reduced(4.0f), 12.0f);
+        g.setColour(juce::Colour(0xff39d9e9));
+        g.drawRoundedRectangle(waveArea.toFloat().reduced(4.0f), 12.0f, 3.0f);
+        g.setColour(juce::Colour(0xffedf7ff));
+        g.setFont(juce::Font(juce::FontOptions(20.0f, juce::Font::bold)));
+        g.drawText("DROP AUDIO TO IMPORT",
+                   waveArea.reduced(20, 20), juce::Justification::centred);
     }
 
     juce::Rectangle<float> eventArea(30.0f, 450.0f, static_cast<float>(getWidth() - 60), 84.0f);
