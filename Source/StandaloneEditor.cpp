@@ -1223,7 +1223,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     // Inspector with aligned labels and controls; no text is drawn beneath another control.
     const int sideX = main.getRight() + 14;
     const int sideW = juce::jmax(220, getWidth() - sideX - 24);
-    juce::Rectangle<int> inspector(sideX, 142, sideW, 426);
+    juce::Rectangle<int> inspector(sideX, 142, sideW, 436);
     g.setColour(surface);
     g.fillRoundedRectangle(inspector.toFloat(), 5.0f);
     g.setColour(edge);
@@ -1252,7 +1252,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
                          static_cast<float>(inspector.getRight() - 12));
     g.setColour(text);
     g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("WORD DETECTION  /  SET UP ONCE", inspector.getX() + 14, inspector.getY() + 326,
+    g.drawText("WORD DETECTION  /  SET UP ONCE", inspector.getX() + 14, inspector.getY() + 332,
                inspector.getWidth() - 26, 14, juce::Justification::centredLeft);
 
     juce::Rectangle<int> analysis(main.getX(), 584, main.getWidth(), 76);
@@ -1309,8 +1309,8 @@ void VocalDynamicsStandaloneEditor::resized()
     settingsButton.setButtonText("AUDIO DEVICE SETTINGS");
     settingsButton.setBounds(inspectorX + 12, 410, inspectorW - 24, 28);
     exportButton.setBounds(inspectorX + 12, 444, inspectorW - 24, 28);
-    whisperExeButton.setBounds(inspectorX + 12, 486, inspectorW - 24, 25);
-    whisperModelButton.setBounds(inspectorX + 12, 516, inspectorW - 24, 25);
+    whisperExeButton.setBounds(inspectorX + 12, 490, inspectorW - 24, 24);
+    whisperModelButton.setBounds(inspectorX + 12, 518, inspectorW - 24, 24);
     transcribeButton.setBounds(inspectorX + 12, 546, inspectorW - 24, 28);
     addWordButton.setVisible(false);
 
