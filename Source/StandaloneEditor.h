@@ -16,6 +16,7 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    bool keyPressed(const juce::KeyPress& key) override;
 
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -47,6 +48,8 @@ private:
     void loadFile(const juce::File& file);
     void togglePlayback();
     void stopPlayback();
+    void zoomBy(double factor);
+    void seekFromMouse(int x);
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source);
     void createWordEventFromSelection();
@@ -55,6 +58,7 @@ private:
     void exportProcessedAudio();
     juce::Rectangle<int> waveformBounds() const;
     double timeAtX(int x) const;
+    void updateZoomLabel();
 
     juce::AudioFormatManager formatManager;
     juce::AudioThumbnailCache thumbnailCache { 8 };
@@ -72,15 +76,20 @@ private:
     int selectedEvent = -1;
     bool isDraggingFile = false;
     bool isSelectingRange = false;
+    bool mouseMovedOnWave = false;
     int selectionStartX = 0;
     int selectionCurrentX = 0;
+    double viewStartSeconds = 0.0;
+    double viewEndSeconds = 0.0;
 
-    juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel;
+    juce::Label title, status, timeLabel, selectedWordLabel, gainValueLabel, zoomLabel;
     juce::TextButton importButton { "IMPORT VOCAL" };
-    juce::TextButton playButton { "PLAY" };
+    juce::TextButton playButton { "PLAY / SPACE" };
     juce::TextButton stopButton { "STOP" };
     juce::TextButton exportButton { "EXPORT WAV" };
-    juce::TextButton addWordButton { "ADD WORD REGION" };
+    juce::TextButton addWordButton { "ADD REGION" };
+    juce::TextButton zoomInButton { "+" };
+    juce::TextButton zoomOutButton { "−" };
     juce::Slider wordGainSlider;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalDynamicsStandaloneEditor)
