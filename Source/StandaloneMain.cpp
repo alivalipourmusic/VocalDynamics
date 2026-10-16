@@ -4,7 +4,7 @@
 class VocalDynamicsStandaloneApplication : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return "Vocal Dynamics Editor"; }
+    const juce::String getApplicationName() override { return "Vocal Editor"; }
     const juce::String getApplicationVersion() override { return "0.1.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
 
