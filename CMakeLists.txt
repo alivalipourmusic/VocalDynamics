@@ -39,6 +39,10 @@ target_sources(VocalDynamics
 )
 
 target_compile_features(VocalDynamics PRIVATE cxx_std_17)
+target_compile_definitions(VocalDynamics
+    PRIVATE
+        JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
+)
 
 target_link_libraries(VocalDynamics
     PRIVATE
