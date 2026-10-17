@@ -15,12 +15,12 @@ FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(VocalDynamics
     COMPANY_NAME "Avlirecordlabel"
-    BUNDLE_ID "com.avlirecordlabel.vocaldynamics"
+    BUNDLE_ID "com.avlirecordlabel.vocaleditor"
     PLUGIN_MANUFACTURER_CODE Avlr
     PLUGIN_CODE Vdyn
     FORMATS VST3 Standalone
     VST3_CAN_REPLACE_VST2 TRUE
-    PRODUCT_NAME "Vocal Dynamics"
+    PRODUCT_NAME "Vocal Editor"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
