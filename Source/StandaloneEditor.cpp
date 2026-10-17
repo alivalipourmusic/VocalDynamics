@@ -271,9 +271,9 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     pitchAnalysisButton.setTooltip("Analyze monophonic pitch with autocorrelation and classify notes against the selected scale.");
     pitchAnalysisButton.onClick = [this] { analyzePitchNotes(); };
     addAndMakeVisible(pitchAnalysisButton);
-    analysisLabel.setText("TEMPO  -- BPM     KEY  --", juce::dontSendNotification);
+    analysisLabel.setText("BPM: --   |   KEY: --", juce::dontSendNotification);
     analysisLabel.setColour(juce::Label::textColourId, cyan);
-    analysisLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+    analysisLabel.setFont(juce::Font(12.0f, juce::Font::bold));
     analysisLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(analysisLabel);
     settingsButton.onClick = [this] { openAudioSettings(); };
@@ -1053,7 +1053,7 @@ void VocalDynamicsStandaloneEditor::analyzeTempoAndKey()
     const auto bpmText = bpm > 0.0 ? juce::String(static_cast<int>(std::round(bpm))) : juce::String("--");
     const auto keyText = frameCount > 0 ? juce::String(noteNames[bestRoot]) + (bestMinor ? " minor" : " major")
                                          : juce::String("unclear");
-    analysisLabel.setText("TEMPO  " + bpmText + " BPM     KEY  " + keyText + "  (estimate)", juce::dontSendNotification);
+    analysisLabel.setText("BPM: " + bpmText + "   |   KEY: " + keyText + " (est.)", juce::dontSendNotification);
     status.setText("Analysis complete. BPM and key are estimates; confirm by ear before using them.", juce::dontSendNotification);
     repaint();
 }
@@ -1419,8 +1419,12 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             g.drawVerticalLine(x, static_cast<float>(drawable.getY()), static_cast<float>(drawable.getBottom()));
             const double t = visibleStart + span * static_cast<double>(i) / 8.0;
             g.setColour(muted);
-            g.setFont(9.5f);
-            g.drawText(formatTimelineTime(t), x - 36, main.getY() + 24, 72, 13, juce::Justification::centred);
+            g.setFont(9.0f);
+            const auto tickText = juce::String::formatted("%02d:%02d",
+                static_cast<int>(t) / 60, static_cast<int>(t) % 60);
+            const int tickWidth = juce::jmin(54, drawable.getWidth() / 8);
+            g.drawText(tickText, juce::Rectangle<int>(x - tickWidth / 2, main.getY() + 24, tickWidth, 13),
+                       juce::Justification::centred, false);
         }
 
         g.setColour(cyan.withAlpha(0.96f));
@@ -1568,9 +1572,10 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.drawText("MUSIC ANALYSIS", analysis.getX() + 14, analysis.getY() + 9, 130, 15,
                juce::Justification::centredLeft);
     g.setColour(text);
-    g.setFont(juce::Font(15.0f, juce::Font::bold));
-    g.drawText(analysisLabel.getText(), analysis.getX() + 14, analysis.getY() + 29,
-               analysis.getWidth() - 190, 25, juce::Justification::centredLeft);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    const int analysisTextWidth = juce::jmax(80, analysisButton.getX() - analysis.getX() - 30);
+    g.drawFittedText(analysisLabel.getText(), analysis.getX() + 14, analysis.getY() + 29,
+                     analysisTextWidth, 25, juce::Justification::centredLeft, 1, 0.75f);
 
     // Scale-aware pitch lane. Green notes belong to the selected scale; red notes do not.
     juce::Rectangle<int> pitchLane(main.getX(), 670, main.getWidth(), 150);
@@ -1652,7 +1657,7 @@ void VocalDynamicsStandaloneEditor::resized()
 
     // Responsive header and inspector: controls follow the available client area.
     status.setBounds(32, height - 28, juce::jmax(120, width - 48), 20);
-    timeLabel.setBounds(285, 34, 220, 28);
+    timeLabel.setBounds(285, 34, juce::jmin(250, juce::jmax(180, width - 650)), 28);
 
     importButton.setButtonText("IMPORT");
     playButton.setButtonText(transport.isPlaying() ? "PAUSE" : "PLAY");
@@ -1690,7 +1695,7 @@ void VocalDynamicsStandaloneEditor::resized()
     transcribeButton.setBounds(innerX, 586, innerW, 28);
     addWordButton.setVisible(false);
 
-    analysisLabel.setBounds(wave.getX() + 14, 612, juce::jmax(160, wave.getWidth() - 210), 24);
+    analysisLabel.setBounds(wave.getX() + 14, 612, juce::jmax(100, wave.getWidth() - 205), 24);
     analysisButton.setBounds(wave.getRight() - 180, 598, 164, 48);
     rootNoteBox.setBounds(wave.getX() + 150, 678, 76, 28);
     scaleBox.setBounds(wave.getX() + 234, 678, 150, 28);
