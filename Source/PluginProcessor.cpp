@@ -43,7 +43,7 @@ VocalDynamicsAudioProcessor::VocalDynamicsAudioProcessor()
 
 const juce::String VocalDynamicsAudioProcessor::getName() const
 {
-    return "Vocal Dynamics";
+    return "Vocal Editor";
 }
 
 void VocalDynamicsAudioProcessor::prepareToPlay(double, int) {}
