@@ -139,23 +139,23 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     const auto muted = juce::Colour(0xff91a3bd);
 
     title.setText("VOCAL EDITOR", juce::dontSendNotification);
-    title.setFont(juce::Font(27.0f, juce::Font::bold));
+    title.setFont(juce::Font(juce::FontOptions(27.0f).withStyle("Bold")));
     title.setColour(juce::Label::textColourId, white);
     addAndMakeVisible(title);
 
     status.setText("Load a vocal, edit individual regions, or analyze tempo and key.", juce::dontSendNotification);
-    status.setFont(juce::Font(12.0f));
+    status.setFont(juce::Font(juce::FontOptions(12.0f)));
     status.setColour(juce::Label::textColourId, cyan);
     addAndMakeVisible(status);
 
     timeLabel.setText("00:00.000  /  00:00.000", juce::dontSendNotification);
-    timeLabel.setFont(juce::Font(16.0f, juce::Font::bold));
+    timeLabel.setFont(juce::Font(juce::FontOptions(16.0f).withStyle("Bold")));
     timeLabel.setColour(juce::Label::textColourId, muted);
     addAndMakeVisible(timeLabel);
 
     selectedWordLabel.setText("No region selected", juce::dontSendNotification);
     selectedWordLabel.setColour(juce::Label::textColourId, white);
-    selectedWordLabel.setFont(juce::Font(15.0f, juce::Font::bold));
+    selectedWordLabel.setFont(juce::Font(juce::FontOptions(15.0f).withStyle("Bold")));
     selectedWordLabel.setEditable(true, true, false);
     selectedWordLabel.onTextChange = [this]
     {
@@ -195,7 +195,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     const auto eqWhite = juce::Colour(0xffedf7ff);
     eqTitle.setText("3-BAND EQ", juce::dontSendNotification);
     eqTitle.setColour(juce::Label::textColourId, eqCyan);
-    eqTitle.setFont(juce::Font(14.0f, juce::Font::bold));
+    eqTitle.setFont(juce::Font(juce::FontOptions(14.0f).withStyle("Bold")));
     addAndMakeVisible(eqTitle);
     auto setupEqSlider = [this, eqCyan, eqWhite](juce::Slider& slider, juce::Label& label, const juce::String& name)
     {
@@ -273,7 +273,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     addAndMakeVisible(pitchAnalysisButton);
     analysisLabel.setText("BPM: --   |   KEY: --", juce::dontSendNotification);
     analysisLabel.setColour(juce::Label::textColourId, cyan);
-    analysisLabel.setFont(juce::Font(12.0f, juce::Font::bold));
+    analysisLabel.setFont(juce::Font(juce::FontOptions(12.0f).withStyle("Bold")));
     analysisLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(analysisLabel);
     settingsButton.onClick = [this] { openAudioSettings(); };
@@ -1372,10 +1372,10 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0x3354f2c2));
     g.fillRect(4, 0, 18, 112);
     g.setColour(text);
-    g.setFont(juce::Font("Aptos Display", 24.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(24.0f).withName("Aptos Display").withStyle("Bold")));
     g.drawText("VOCAL", 28, 14, 104, 29, juce::Justification::centredLeft);
     g.setColour(cyan);
-    g.setFont(juce::Font("Aptos Display", 20.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(20.0f).withName("Aptos Display").withStyle("Bold")));
     g.drawText("EDITOR", 28, 43, 140, 24, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.5f);
@@ -1387,7 +1387,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.setFont(10.0f);
     g.drawText("TRANSPORT", 285, 17, 90, 14, juce::Justification::centredLeft);
     g.setColour(text);
-    g.setFont(juce::Font(18.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(18.0f).withStyle("Bold")));
     g.drawText(timeLabel.getText(), 285, 34, 220, 27, juce::Justification::centredLeft);
     g.setColour(muted);
     g.setFont(10.0f);
