@@ -310,7 +310,7 @@ VocalDynamicsStandaloneEditor::VocalDynamicsStandaloneEditor()
     deviceManager.addAudioCallback(this);
     refreshAudioStatus();
     startTimerHz(20);
-    setSize(1240, 880);
+    setSize(1440, 900);
 }
 
 VocalDynamicsStandaloneEditor::~VocalDynamicsStandaloneEditor()
@@ -678,7 +678,7 @@ void VocalDynamicsStandaloneEditor::stopPlayback()
 
 juce::Rectangle<int> VocalDynamicsStandaloneEditor::waveformBounds() const
 {
-    return { 24, 142, juce::jmax(420, getWidth() - 360), 286 };
+    return { 24, 142, juce::jmax(520, getWidth() - 380), 286 };
 }
 
 double VocalDynamicsStandaloneEditor::timeAtX(int x) const
@@ -1650,9 +1650,8 @@ void VocalDynamicsStandaloneEditor::resized()
     const int innerX = inspectorX + 14;
     const int innerW = juce::jmax(180, inspectorW - 28);
 
-    // All controls are positioned from shared panel geometry so labels, buttons,
-    // and interactive widgets cannot drift apart as the window is resized.
-    status.setBounds(32, height - 28, width - 48, 20);
+    // Responsive header and inspector: controls follow the available client area.
+    status.setBounds(32, height - 28, juce::jmax(120, width - 48), 20);
     timeLabel.setBounds(285, 34, 220, 28);
 
     importButton.setButtonText("IMPORT");
@@ -1664,14 +1663,15 @@ void VocalDynamicsStandaloneEditor::resized()
     zoomOutButton.setButtonText("-");
     zoomInButton.setButtonText("+");
 
-    importButton.setBounds(width - 520, 34, 72, 36);
-    recordButton.setButtonText(recordingActive ? "■ STOP REC" : "● RECORD");
-    recordButton.setBounds(width - 442, 34, 98, 36);
-    playButton.setBounds(width - 338, 34, 74, 36);
-    stopButton.setBounds(width - 258, 34, 58, 36);
-    zoomOutButton.setBounds(width - 190, 34, 30, 36);
-    zoomLabel.setBounds(width - 154, 34, 54, 36);
-    zoomInButton.setBounds(width - 94, 34, 30, 36);
+    const int toolbarRight = width - 24;
+    zoomInButton.setBounds(toolbarRight - 30, 34, 30, 36);
+    zoomLabel.setBounds(toolbarRight - 90, 34, 54, 36);
+    zoomOutButton.setBounds(toolbarRight - 126, 34, 30, 36);
+    stopButton.setBounds(toolbarRight - 194, 34, 58, 36);
+    playButton.setBounds(toolbarRight - 276, 34, 74, 36);
+    recordButton.setButtonText(recordingActive ? "STOP REC" : "RECORD");
+    recordButton.setBounds(toolbarRight - 380, 34, 96, 36);
+    importButton.setBounds(toolbarRight - 458, 34, 72, 36);
 
     selectedWordLabel.setBounds(innerX, 195, innerW, 30);
     gainValueLabel.setBounds(innerX, 264, innerW, 24);
