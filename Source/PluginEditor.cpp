@@ -20,7 +20,7 @@ VocalDynamicsAudioProcessorEditor(
     const auto panel = juce::Colour(0xff111f2d);
 
     titleLabel.setText(
-        "VOCAL DYNAMICS",
+        "VOCAL EDITOR",
         juce::dontSendNotification);
     titleLabel.setFont(
         juce::Font(27.0f, juce::Font::bold));
@@ -29,7 +29,7 @@ VocalDynamicsAudioProcessorEditor(
     addAndMakeVisible(titleLabel);
 
     statusLabel.setText(
-        "WORD-LEVEL DYNAMICS EDITOR  /  STAGE 1",
+        "PRECISION VOCAL EDITING  /  EARLY DEVELOPMENT",
         juce::dontSendNotification);
     statusLabel.setFont(juce::Font(12.0f));
     statusLabel.setColour(
@@ -61,7 +61,7 @@ VocalDynamicsAudioProcessorEditor(
         juce::TextButton::textColourOffId, white);
     analyzeButton.onClick = [this] {
         statusLabel.setText(
-            "Speech analysis engine is not connected yet",
+            "AI analysis is planned but not connected yet",
             juce::dontSendNotification);
     };
     addAndMakeVisible(analyzeButton);
@@ -73,7 +73,7 @@ VocalDynamicsAudioProcessorEditor(
         juce::TextButton::textColourOffId, white);
     playButton.onClick = [this] {
         statusLabel.setText(
-            "Playback will be implemented in the editor engine",
+            "Editor playback is not implemented yet",
             juce::dontSendNotification);
     };
     addAndMakeVisible(playButton);
@@ -147,7 +147,7 @@ void VocalDynamicsAudioProcessorEditor::loadAudioFile(
         juce::dontSendNotification);
 
     statusLabel.setText(
-        "Audio loaded - word analysis is the next step",
+        "Audio loaded - AI analysis is not connected yet",
         juce::dontSendNotification);
 
     repaint();
@@ -188,7 +188,6 @@ void VocalDynamicsAudioProcessorEditor::paint(
         static_cast<float>(getWidth() - 60),
         2.0f, 1.0f);
 
-    // Main waveform panel.
     juce::Rectangle<int> waveArea(
         30, 150, getWidth() - 60, 280);
 
@@ -227,7 +226,7 @@ void VocalDynamicsAudioProcessorEditor::paint(
             juce::Justification::centred);
     }
 
-    // Event lane placeholder: no fake word detection.
+    // Placeholder only: word/phoneme detection is not implemented.
     juce::Rectangle<float> eventArea(
         30.0f, 444.0f,
         static_cast<float>(getWidth() - 60),
@@ -242,7 +241,7 @@ void VocalDynamicsAudioProcessorEditor::paint(
     g.setColour(purple);
     g.setFont(13.0f);
     g.drawText(
-        "WORD / SYLLABLE / PHRASE EVENTS",
+        "WORD / SYLLABLE / PHONEME EVENTS",
         eventArea.getX() + 14.0f,
         eventArea.getY() + 10.0f,
         eventArea.getWidth() - 28.0f,
@@ -252,12 +251,11 @@ void VocalDynamicsAudioProcessorEditor::paint(
     g.setColour(muted);
     g.setFont(12.0f);
     g.drawText(
-        "Word boundaries and editable gain events will appear here "
-        "after the analysis engine is implemented.",
+        "Event detection and per-region editing are planned; "
+        "no word analysis engine is connected yet.",
         eventArea.reduced(14.0f).withTrimmedTop(32.0f),
         juce::Justification::centredLeft);
 
-    // Word editing panel.
     juce::Rectangle<float> editArea(
         30.0f, 570.0f,
         static_cast<float>(getWidth() - 60),
@@ -272,21 +270,21 @@ void VocalDynamicsAudioProcessorEditor::paint(
     g.setColour(white);
     g.setFont(14.0f);
     g.drawText(
-        "SELECTED WORD",
+        "SELECTED EVENT",
         48, 583, 180, 22,
         juce::Justification::centredLeft);
 
     g.setColour(muted);
     g.setFont(12.0f);
     g.drawText(
-        "No word selected",
+        "No event selected",
         48, 610, 180, 22,
         juce::Justification::centredLeft);
 
     g.setColour(cyan);
     g.setFont(11.0f);
     g.drawText(
-        "STAGE 1  |  FILE IMPORT + WAVEFORM FOUNDATION",
+        "VOCAL EDITOR  |  WAVEFORM FOUNDATION",
         30, getHeight() - 25,
         getWidth() - 60, 16,
         juce::Justification::centred);
