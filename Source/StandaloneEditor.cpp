@@ -1524,7 +1524,7 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     // Inspector with aligned labels and controls; no text is drawn beneath another control.
     const int sideX = main.getRight() + 14;
     const int sideW = juce::jmax(220, getWidth() - sideX - 24);
-    juce::Rectangle<int> inspector(sideX, 142, sideW, 436);
+    juce::Rectangle<int> inspector(sideX, 142, sideW, 530);
     g.setColour(surface);
     g.fillRoundedRectangle(inspector.toFloat(), 5.0f);
     g.setColour(edge);
@@ -1542,18 +1542,18 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
     g.setFont(10.5f);
     g.drawText("SELECTED WORD / REGION", inspector.getX() + 14, inspector.getY() + 47,
                inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
-    g.drawText("GAIN", inspector.getX() + 14, inspector.getY() + 153,
+    g.drawText("GAIN", inspector.getX() + 14, inspector.getY() + 105,
                inspector.getWidth() - 26, 16, juce::Justification::centredLeft);
     g.setColour(cyan);
     g.setFont(juce::Font(20.0f, juce::Font::bold));
-    g.drawText(gainValueLabel.getText(), inspector.getX() + 14, inspector.getY() + 169,
+    g.drawText(gainValueLabel.getText(), inspector.getX() + 14, inspector.getY() + 121,
                inspector.getWidth() - 26, 28, juce::Justification::centredLeft);
     g.setColour(edge);
-    g.drawHorizontalLine(inspector.getY() + 252, static_cast<float>(inspector.getX() + 12),
+    g.drawHorizontalLine(inspector.getY() + 300, static_cast<float>(inspector.getX() + 12),
                          static_cast<float>(inspector.getRight() - 12));
     g.setColour(text);
     g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("WORD DETECTION  /  SET UP ONCE", inspector.getX() + 14, inspector.getY() + 332,
+    g.drawText("WORD DETECTION  /  SET UP ONCE", inspector.getX() + 14, inspector.getY() + 474,
                inspector.getWidth() - 26, 14, juce::Justification::centredLeft);
 
     juce::Rectangle<int> analysis(main.getX(), 584, main.getWidth(), 76);
@@ -1673,21 +1673,21 @@ void VocalDynamicsStandaloneEditor::resized()
     zoomLabel.setBounds(width - 154, 34, 54, 36);
     zoomInButton.setBounds(width - 94, 34, 30, 36);
 
-    selectedWordLabel.setBounds(innerX, 210, innerW, 30);
-    gainValueLabel.setBounds(innerX, 310, innerW, 24);
-    wordGainSlider.setBounds(innerX, 336, innerW, 72);
-    eqTitle.setBounds(innerX, 408, innerW, 22);
-    lowEqLabel.setBounds(innerX, 432, 42, 22);
-    lowEqSlider.setBounds(innerX + 42, 432, innerW - 42, 22);
-    midEqLabel.setBounds(innerX, 456, 42, 22);
-    midEqSlider.setBounds(innerX + 42, 456, innerW - 42, 22);
-    highEqLabel.setBounds(innerX, 480, 42, 22);
-    highEqSlider.setBounds(innerX + 42, 480, innerW - 42, 22);
-    settingsButton.setBounds(innerX, 510, innerW, 28);
-    exportButton.setBounds(innerX, 544, innerW, 28);
-    whisperExeButton.setBounds(innerX, 584, innerW, 26);
-    whisperModelButton.setBounds(innerX, 614, innerW, 26);
-    transcribeButton.setBounds(innerX, 644, innerW, 28);
+    selectedWordLabel.setBounds(innerX, 195, innerW, 30);
+    gainValueLabel.setBounds(innerX, 264, innerW, 24);
+    wordGainSlider.setBounds(innerX, 286, innerW, 66);
+    eqTitle.setBounds(innerX, 358, innerW, 22);
+    lowEqLabel.setBounds(innerX, 382, 42, 22);
+    lowEqSlider.setBounds(innerX + 42, 382, innerW - 42, 22);
+    midEqLabel.setBounds(innerX, 406, 42, 22);
+    midEqSlider.setBounds(innerX + 42, 406, innerW - 42, 22);
+    highEqLabel.setBounds(innerX, 430, 42, 22);
+    highEqSlider.setBounds(innerX + 42, 430, innerW - 42, 22);
+    settingsButton.setBounds(innerX, 462, innerW, 28);
+    exportButton.setBounds(innerX, 494, innerW, 28);
+    whisperExeButton.setBounds(innerX, 530, innerW, 26);
+    whisperModelButton.setBounds(innerX, 558, innerW, 26);
+    transcribeButton.setBounds(innerX, 586, innerW, 28);
     addWordButton.setVisible(false);
 
     analysisLabel.setBounds(wave.getX() + 14, 612, juce::jmax(160, wave.getWidth() - 210), 24);
