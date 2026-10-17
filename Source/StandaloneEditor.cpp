@@ -1419,12 +1419,14 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             g.drawVerticalLine(x, static_cast<float>(drawable.getY()), static_cast<float>(drawable.getBottom()));
             const double t = visibleStart + span * static_cast<double>(i) / 8.0;
             g.setColour(muted);
-            g.setFont(9.0f);
+            g.setFont(juce::FontOptions(9.0f));
             const auto tickText = juce::String::formatted("%02d:%02d",
                 static_cast<int>(t) / 60, static_cast<int>(t) % 60);
-            const int tickWidth = juce::jmin(54, drawable.getWidth() / 8);
-            g.drawText(tickText, juce::Rectangle<int>(x - tickWidth / 2, main.getY() + 24, tickWidth, 13),
-                       juce::Justification::centred, false);
+            const int tickWidth = juce::jmin(48, juce::jmax(28, drawable.getWidth() / 10));
+            const int tickX = juce::jlimit(main.getX() + 4, main.getRight() - tickWidth - 4,
+                                            x - tickWidth / 2);
+            g.drawFittedText(tickText, tickX, main.getY() + 24, tickWidth, 13,
+                             juce::Justification::centred, 1, 0.8f);
         }
 
         g.setColour(cyan.withAlpha(0.96f));
@@ -1448,7 +1450,6 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
         {
             const double playheadTime = juce::jlimit(visibleStart, visibleEnd, transport.getCurrentPosition());
             const int x = drawable.getX() + static_cast<int>((playheadTime - visibleStart) / span * drawable.getWidth());
-            g.setColour(juce::Colour(0xfff6fcff));
             g.setColour(juce::Colour(0xfff6fcff));
             g.drawVerticalLine(x, static_cast<float>(drawable.getY() - 2), static_cast<float>(drawable.getBottom()));
             g.setColour(cyan);
@@ -1519,9 +1520,13 @@ void VocalDynamicsStandaloneEditor::paint(juce::Graphics& g)
             g.setColour(i == selectedEvent ? cyan : edge);
             g.drawRoundedRectangle(block, 3.0f, i == selectedEvent ? 1.5f : 1.0f);
             g.setColour(text);
-            g.setFont(10.0f);
-            g.drawText(e.word + "  " + juce::String(e.gainDb, 1) + " dB", block.reduced(3.0f),
-                       juce::Justification::centred);
+            g.setFont(juce::FontOptions(10.0f));
+            // Small events must never paint glyphs outside their block.
+            const auto eventText = block.toNearestInt().reduced(3, 0);
+            const auto label = block.getWidth() < 48.0f
+                ? e.word
+                : e.word + "  " + juce::String(e.gainDb, 1) + " dB";
+            g.drawFittedText(label, eventText, juce::Justification::centred, 1, 0.7f);
         }
     }
 
